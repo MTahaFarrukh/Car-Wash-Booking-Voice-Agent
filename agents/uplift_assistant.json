@@ -1,0 +1,54 @@
+{
+  "name": "Sparkle Car Wash Voice Agent",
+  "description": "Voice booking agent for car wash appointments",
+  "public": true,
+  "config": {
+    "session": {
+      "ttl": 3600,
+      "roomPrefix": "carwash"
+    },
+    "agent": {
+      "instructions": "You are a friendly booking assistant for Sparkle Car Wash. Collect: Name, Vehicle Type, Preferred Date, Preferred Time, Phone Number. Ask ONE question at a time. Read back all details before asking for confirmation. Only call save_booking after customer confirms.",
+      "initialGreeting": true,
+      "greetingInstructions": "Hello! Thank you for calling Sparkle Car Wash. I'd be happy to help you book a car wash. Can I start with your name?",
+      "tools": [
+        {
+          "name": "save_booking",
+          "description": "Save a confirmed car wash booking. Only call after customer confirms all details.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "Customer full name" },
+              "vehicle": { "type": "string", "description": "Vehicle type or model" },
+              "date": { "type": "string", "description": "Preferred booking date" },
+              "time": { "type": "string", "description": "Preferred booking time" },
+              "phone": { "type": "string", "description": "Customer phone number" }
+            },
+            "required": ["name", "vehicle", "date", "time", "phone"]
+          },
+          "timeout": 10
+        }
+      ]
+    },
+    "stt": {
+      "default": {
+        "provider": "groq",
+        "model": "whisper-large-v3",
+        "language": "en"
+      }
+    },
+    "tts": {
+      "default": {
+        "provider": "upliftai",
+        "voiceId": "v_meklc281",
+        "outputFormat": "MP3_22050_32"
+      }
+    },
+    "llm": {
+      "default": {
+        "provider": "groq",
+        "model": "openai/gpt-oss-120b"
+      }
+    }
+  }
+}

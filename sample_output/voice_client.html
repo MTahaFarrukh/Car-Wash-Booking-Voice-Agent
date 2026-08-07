@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sparkle Car Wash - Uplift Voice Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; }
+    h1 { color: #1a5f2a; }
+    label { display: block; margin-top: 12px; font-weight: bold; }
+    input { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+    button { margin-top: 16px; padding: 10px 20px; background: #1a5f2a; color: white; border: none; cursor: pointer; }
+    .note { background: #f0f7f1; padding: 12px; border-radius: 6px; margin-top: 20px; font-size: 14px; }
+    #widget-container { margin-top: 24px; min-height: 120px; }
+  </style>
+</head>
+<body>
+  <h1>Sparkle Car Wash Voice Agent</h1>
+  <p>Minimal test page for the Uplift AI Voice booking agent.</p>
+
+  <label for="assistant-id">Uplift Assistant ID</label>
+  <input id="assistant-id" type="text" placeholder="Paste your public assistant ID">
+
+  <label for="api-url">Backend API URL</label>
+  <input id="api-url" type="text" value="http://localhost:8000">
+
+  <button onclick="loadWidget()">Start Voice Assistant</button>
+
+  <div class="note">
+    <strong>Before testing:</strong>
+    <ol>
+      <li>Run <code>python app.py</code> in the project folder.</li>
+      <li>Create the Uplift assistant using <code>agents/uplift_assistant.json</code>.</li>
+      <li>Set the assistant to <strong>public</strong> in Uplift dashboard.</li>
+      <li>For <code>save_booking</code> tool execution, use the React SDK pattern in <code>agents/uplift_agent.md</code>.</li>
+      <li>Verify saved bookings: <code>GET /bookings</code> or check <code>bookings.csv</code>.</li>
+    </ol>
+  </div>
+
+  <div id="widget-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@upliftai/assistant-widget@0.0.1"></script>
+  <script>
+    // Register save_booking handler if widget supports custom tools
+    window.saveBookingHandler = async function(args) {
+      const apiUrl = document.getElementById('api-url').value.replace(/\/$/, '');
+      const response = await fetch(apiUrl + '/booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: args.name,
+          vehicle: args.vehicle,
+          date: args.date,
+          time: args.time,
+          phone: args.phone
+        })
+      });
+      return response.json();
+    };
+
+    function loadWidget() {
+      const assistantId = document.getElementById('assistant-id').value.trim();
+      if (!assistantId) {
+        alert('Please enter your Uplift Assistant ID');
+        return;
+      }
+      const container = document.getElementById('widget-container');
+      container.innerHTML = '<upliftai-assistant assistant-id="' + assistantId + '"></upliftai-assistant>';
+    }
+  </script>
+</body>
+</html>

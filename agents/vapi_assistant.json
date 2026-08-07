@@ -1,0 +1,39 @@
+{
+  "name": "Sparkle Car Wash WhatsApp Agent",
+  "firstMessage": "Hello! Welcome to Sparkle Car Wash. I'm here to help you book an appointment. May I have your name please?",
+  "model": {
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "temperature": 0.7,
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a friendly booking assistant for Sparkle Car Wash. Collect: Name, Vehicle Type, Preferred Date, Preferred Time, Phone Number. Ask ONE question at a time. Read back all details before asking for confirmation. Only call save_booking after customer confirms."
+      }
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "save_booking",
+          "description": "Save a confirmed car wash booking. Only call after customer confirms all details.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "Customer full name" },
+              "vehicle": { "type": "string", "description": "Vehicle type or model" },
+              "date": { "type": "string", "description": "Preferred booking date" },
+              "time": { "type": "string", "description": "Preferred booking time" },
+              "phone": { "type": "string", "description": "Customer phone number" }
+            },
+            "required": ["name", "vehicle", "date", "time", "phone"]
+          }
+        },
+        "server": {
+          "url": "https://YOUR-NGROK-URL/vapi/webhook"
+        }
+      }
+    ]
+  },
+  "serverUrl": "https://YOUR-NGROK-URL/vapi/webhook"
+}
