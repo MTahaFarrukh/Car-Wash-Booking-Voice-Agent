@@ -44,13 +44,16 @@ def root() -> dict:
 @app.post("/booking")
 def create_booking(booking: BookingRequest) -> dict:
     """Save a new booking (used by Uplift client and manual testing)."""
-    return save_booking(
+    print(f"[Uplift/booking] saving: {booking.model_dump()}")
+    result = save_booking(
         name=booking.name,
         vehicle=booking.vehicle,
         date=booking.date,
         time=booking.time,
         phone=booking.phone,
     )
+    print(f"[Uplift/booking] saved: {result['booking']}")
+    return result
 
 
 @app.get("/bookings")
@@ -261,4 +264,5 @@ async def vapi_webhook(request: Request) -> JSONResponse:
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("app:app", host=HOST, port=PORT, reload=True)
+    # Pass app directly (not "app:app") so uvicorn never starts a reload subprocess.
+    uvicorn.run(app, host=HOST, port=PORT)
