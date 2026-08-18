@@ -1,0 +1,13 @@
+# Terminal 1 — Backend
+cd backend
+.\venv\Scripts\activate
+
+# First-time database setup (Phase 2)
+alembic upgrade head
+python -m scripts.seed
+
+uvicorn app.main:app --reload --port 8000
+
+# Terminal 2 — Frontend
+cd frontend
+npm run dev
