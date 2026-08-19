@@ -6,7 +6,9 @@ AI-powered car wash receptionist and booking platform — a monorepo with a Next
 
 **Phase 2** adds Alembic migrations, database indexes, and idempotent development seed data.
 
-Booking logic, REST APIs, auth, and voice integration arrive in later phases.
+**Phase 3** adds the booking domain layer: `BookingService`, `AvailabilityService`, slot engine, conflict detection, and unit tests.
+
+REST APIs, dashboard UI, auth, and voice integration arrive in later phases.
 
 ## Project structure
 
@@ -111,11 +113,28 @@ Production build check:
 npm run build
 ```
 
+## Phase 3 scope
+
+| Included | Deferred |
+|----------|----------|
+| `AvailabilityService` — slot generation, conflict detection, `check_availability()` | REST API routers (Phase 4) |
+| `BookingService` — create, reschedule, cancel, get, list | Dashboard UI (Phase 5) |
+| Pure slot engine + domain exceptions | AI tools / Uplift (Phases 7–8) |
+| Unit tests (`pytest tests/`) | |
+
+Run tests:
+
+```powershell
+cd backend
+venv\Scripts\activate
+pytest tests/ -v
+```
+
 ## Phase 2 scope
 
 | Included | Deferred |
 |----------|----------|
-| Initial Alembic migration (`f8a2b1c3d4e5`) | Booking service and REST routers (Phases 3–4) |
+| Initial Alembic migration (`f8a2b1c3d4e5`) | REST API routers (Phase 4) |
 | Indexes on booking status, dates, customer phone, call start time | Dashboard pages (Phase 5) |
 | Idempotent seed script (`python -m scripts.seed`) | Supabase Auth (Phase 6) |
 | Sample business data (Sparkle Car Wash) | AI tools and Uplift integration (Phases 7–8) |
