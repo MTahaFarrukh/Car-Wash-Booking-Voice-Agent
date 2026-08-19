@@ -7,6 +7,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import engine
+from app.routers import (
+    availability_router,
+    bookings_router,
+    customers_router,
+    services_router,
+    vehicles_router,
+)
 
 # Import models so SQLAlchemy registers metadata (used by Alembic in Phase 2)
 import app.models  # noqa: F401
@@ -26,6 +33,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(customers_router)
+app.include_router(vehicles_router)
+app.include_router(services_router)
+app.include_router(availability_router)
+app.include_router(bookings_router)
 
 
 @app.get("/health")
