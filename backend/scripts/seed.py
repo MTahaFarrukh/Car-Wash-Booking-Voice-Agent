@@ -85,10 +85,11 @@ AVAILABILITY = [
 
 
 def is_seeded(session) -> bool:
-    """Return True when development seed data is already present."""
+    """Return True when full development seed data is already present."""
     admin = session.scalar(select(User).where(User.email == SEED_ADMIN_EMAIL))
     marker_customer = session.scalar(select(Customer).where(Customer.phone == SEED_MARKER_PHONE))
-    return admin is not None and marker_customer is not None
+    has_bookings = session.scalar(select(Booking.id).limit(1)) is not None
+    return admin is not None and marker_customer is not None and has_bookings
 
 
 def seed_admin(session) -> User:
