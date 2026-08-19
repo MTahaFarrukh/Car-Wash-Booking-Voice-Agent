@@ -26,6 +26,16 @@ def _future_weekday(days_ahead: int = 14) -> date:
     return candidate
 
 
+def _pick_available_slots(db_session, service_id, *, min_slots: int = 1) -> tuple[date, list[time]]:
+    availability = AvailabilityService(db_session)
+    for days_ahead in range(14, 90):
+        booking_date = _future_weekday(days_ahead)
+        slots = availability.get_available_slots(booking_date, service_id)
+        if len(slots) >= min_slots:
+            return booking_date, slots
+    pytest.skip("No suitable available slots found in date range")
+
+
 @requires_database
 class TestBookingServiceIntegration:
     def test_create_booking_when_slot_is_free(self, db_session):
@@ -59,8 +69,8 @@ class TestBookingServiceIntegration:
         vehicle = db_session.scalar(select(Vehicle).where(Vehicle.customer_id == customer.id).limit(1))
         wash = db_session.scalar(select(Service).where(Service.name == "Premium Wash"))
 
-        booking_date = _future_weekday(21)
-        booking_time = time(14, 0)
+        booking_date, slots = _pick_available_slots(db_session, wash.id, min_slots=1)
+        booking_time = slots[0]
 
         service.create_booking(
             customer_id=customer.id,
@@ -85,17 +95,17 @@ class TestBookingServiceIntegration:
         vehicle = db_session.scalar(select(Vehicle).where(Vehicle.customer_id == customer.id).limit(1))
         wash = db_session.scalar(select(Service).where(Service.name == "Basic Wash"))
 
-        booking_date = _future_weekday(28)
+        booking_date, slots = _pick_available_slots(db_session, wash.id, min_slots=2)
         booking = service.create_booking(
             customer_id=customer.id,
             vehicle_id=vehicle.id,
             service_id=wash.id,
             booking_date=booking_date,
-            booking_time=time(11, 0),
+            booking_time=slots[0],
         )
 
-        updated = service.reschedule_booking(booking.id, new_date=booking_date, new_time=time(12, 0))
-        assert updated.booking_time == time(12, 0)
+        updated = service.reschedule_booking(booking.id, new_date=booking_date, new_time=slots[1])
+        assert updated.booking_time == slots[1]
 
     def test_reschedule_to_occupied_slot_fails(self, db_session):
         service = BookingService(db_session)
@@ -103,24 +113,24 @@ class TestBookingServiceIntegration:
         vehicle = db_session.scalar(select(Vehicle).where(Vehicle.customer_id == customer.id).limit(1))
         wash = db_session.scalar(select(Service).where(Service.name == "Basic Wash"))
 
-        booking_date = _future_weekday(35)
+        booking_date, slots = _pick_available_slots(db_session, wash.id, min_slots=2)
         first = service.create_booking(
             customer_id=customer.id,
             vehicle_id=vehicle.id,
             service_id=wash.id,
             booking_date=booking_date,
-            booking_time=time(10, 0),
+            booking_time=slots[0],
         )
         second = service.create_booking(
             customer_id=customer.id,
             vehicle_id=vehicle.id,
             service_id=wash.id,
             booking_date=booking_date,
-            booking_time=time(11, 0),
+            booking_time=slots[1],
         )
 
         with pytest.raises(SlotUnavailableError):
-            service.reschedule_booking(second.id, new_date=booking_date, new_time=time(10, 0))
+            service.reschedule_booking(second.id, new_date=booking_date, new_time=slots[0])
 
         db_session.refresh(first)
 

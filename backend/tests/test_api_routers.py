@@ -23,6 +23,24 @@ def _future_weekday(days_ahead: int = 14) -> date:
     return candidate
 
 
+def _pick_slot_for_service(service_id: str) -> tuple[date, str]:
+    for days_ahead in range(14, 90):
+        booking_date = _future_weekday(days_ahead)
+        response = client.get(
+            "/api/availability",
+            params={
+                "booking_date": booking_date.isoformat(),
+                "service_id": service_id,
+            },
+        )
+        if response.status_code != 200:
+            continue
+        alternatives = response.json().get("alternatives", [])
+        if alternatives:
+            return booking_date, alternatives[0]
+    raise AssertionError("No available booking slot found")
+
+
 @requires_database
 class TestApiRouters:
     def test_create_and_get_customer(self):
@@ -116,8 +134,7 @@ class TestApiRouters:
             service = db.scalar(select(Service).where(Service.name == "Basic Wash"))
             assert service is not None
 
-        booking_date = _future_weekday(21)
-        booking_time = "13:00:00"
+        booking_date, booking_time = _pick_slot_for_service(str(service.id))
         create_resp = client.post(
             "/api/bookings",
             json={
@@ -136,15 +153,26 @@ class TestApiRouters:
         get_resp = client.get(f"/api/bookings/{booking_id}")
         assert get_resp.status_code == 200
 
+        availability_resp = client.get(
+            "/api/availability",
+            params={
+                "booking_date": booking_date.isoformat(),
+                "service_id": str(service.id),
+            },
+        )
+        assert availability_resp.status_code == 200
+        alternatives = availability_resp.json().get("alternatives", [])
+        new_time = next((slot for slot in alternatives if slot != booking_time), booking_time)
+
         patch_resp = client.patch(
             f"/api/bookings/{booking_id}",
             json={
                 "booking_date": booking_date.isoformat(),
-                "booking_time": "14:00:00",
+                "booking_time": new_time,
             },
         )
         assert patch_resp.status_code == 200
-        assert patch_resp.json()["booking_time"] == "14:00:00"
+        assert patch_resp.json()["booking_time"] == new_time
 
         history_resp = client.get(f"/api/customers/{customer_id}/bookings")
         assert history_resp.status_code == 200
