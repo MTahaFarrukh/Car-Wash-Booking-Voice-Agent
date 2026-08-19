@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.models.enum_utils import enum_values
 
 
 class BookingStatus(str, enum.Enum):
@@ -40,13 +41,15 @@ class Booking(Base):
     booking_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     booking_time: Mapped[time] = mapped_column(Time, nullable=False)
     status: Mapped[BookingStatus] = mapped_column(
-        Enum(BookingStatus, name="booking_status"),
+        Enum(BookingStatus, name="booking_status", values_callable=enum_values),
         default=BookingStatus.PENDING,
         nullable=False,
         index=True,
     )
     source: Mapped[BookingSource] = mapped_column(
-        Enum(BookingSource, name="booking_source"), default=BookingSource.DASHBOARD, nullable=False
+        Enum(BookingSource, name="booking_source", values_callable=enum_values),
+        default=BookingSource.DASHBOARD,
+        nullable=False,
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

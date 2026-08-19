@@ -13,7 +13,8 @@ class Settings(BaseSettings):
     """Central settings for the FastAPI backend."""
 
     model_config = SettingsConfigDict(
-        env_file=(BASE_DIR / ".env", BASE_DIR / ".env.example"),
+        # Load defaults from .env.example first, then override with real .env.
+        env_file=(BASE_DIR / ".env.example", BASE_DIR / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )

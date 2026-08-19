@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.models.enum_utils import enum_values
 
 
 class CallOutcome(str, enum.Enum):
@@ -32,7 +33,9 @@ class CallLog(Base):
     )
     duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     outcome: Mapped[CallOutcome] = mapped_column(
-        Enum(CallOutcome, name="call_outcome"), default=CallOutcome.NO_BOOKING, nullable=False
+        Enum(CallOutcome, name="call_outcome", values_callable=enum_values),
+        default=CallOutcome.NO_BOOKING,
+        nullable=False,
     )
     booking_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("bookings.id", ondelete="SET NULL"), nullable=True, index=True
