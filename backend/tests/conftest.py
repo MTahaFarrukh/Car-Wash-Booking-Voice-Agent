@@ -9,8 +9,11 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
+os.environ.setdefault("WHATSAPP_BRIDGE_SECRET", "test-bridge-secret")
+
 from app.core.config import get_settings
 
+get_settings.cache_clear()
 settings = get_settings()
 
 

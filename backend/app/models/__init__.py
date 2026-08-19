@@ -7,6 +7,7 @@ from app.models.customer import Customer
 from app.models.service import Service
 from app.models.user import User
 from app.models.vehicle import Vehicle
+from app.models.whatsapp_message import WhatsAppProcessedMessage
 
 __all__ = [
     "Availability",
@@ -19,4 +20,5 @@ __all__ = [
     "Service",
     "User",
     "Vehicle",
+    "WhatsAppProcessedMessage",
 ]

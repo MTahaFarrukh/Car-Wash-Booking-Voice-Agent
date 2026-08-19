@@ -2,7 +2,7 @@
 cd backend
 .\venv\Scripts\activate
 
-# First-time database setup (Phase 2)
+# First-time database setup (Phase 2 + Phase 6 WhatsApp migration)
 alembic upgrade head
 python -m scripts.seed
 
@@ -11,3 +11,10 @@ uvicorn app.main:app --reload --port 8000
 # Terminal 2 — Frontend
 cd frontend
 npm run dev
+
+# Terminal 3 — WhatsApp bridge (Phase 6)
+cd whatsapp-bridge
+copy .env.example .env
+npm install
+npm start
+# Scan the QR code, then send "Hi" from WhatsApp

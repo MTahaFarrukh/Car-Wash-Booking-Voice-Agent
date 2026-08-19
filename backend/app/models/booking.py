@@ -23,6 +23,7 @@ class BookingStatus(str, enum.Enum):
 class BookingSource(str, enum.Enum):
     VOICE = "voice"
     DASHBOARD = "dashboard"
+    WHATSAPP = "whatsapp"
 
 
 class Booking(Base):

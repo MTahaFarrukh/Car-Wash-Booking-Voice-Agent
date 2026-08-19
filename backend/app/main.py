@@ -13,6 +13,7 @@ from app.routers import (
     customers_router,
     services_router,
     vehicles_router,
+    whatsapp_router,
 )
 
 # Import models so SQLAlchemy registers metadata (used by Alembic in Phase 2)
@@ -39,6 +40,7 @@ app.include_router(vehicles_router)
 app.include_router(services_router)
 app.include_router(availability_router)
 app.include_router(bookings_router)
+app.include_router(whatsapp_router)
 
 
 @app.get("/health")

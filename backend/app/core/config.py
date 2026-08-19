@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     uplift_agent_id: str = ""
     cors_origins: str = "http://localhost:3000"
     environment: str = "development"
+    whatsapp_bridge_secret: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

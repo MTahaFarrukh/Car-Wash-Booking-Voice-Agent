@@ -19,6 +19,8 @@ __pycache__/
 frontend/node_modules/
 frontend/.next/
 frontend/out/
+whatsapp-bridge/node_modules/
+whatsapp-bridge/auth_info/
 npm-debug.log*
 
 # IDE / OS
