@@ -10,5 +10,5 @@ export const config = {
   bridgeSecret: process.env.WHATSAPP_BRIDGE_SECRET || "",
   sessionPath: process.env.WHATSAPP_SESSION_PATH || path.resolve(__dirname, "..", "auth_info"),
   logLevel: process.env.LOG_LEVEL || "info",
-  backendTimeoutMs: Number(process.env.BACKEND_TIMEOUT_MS || 30000),
+  backendTimeoutMs: Number(process.env.BACKEND_TIMEOUT_MS || 180000),
 };

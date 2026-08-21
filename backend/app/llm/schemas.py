@@ -16,6 +16,8 @@ class LLMToolCall(BaseModel):
     id: str
     name: str
     arguments: dict[str, Any] = Field(default_factory=dict)
+    # Gemini 3.x thought signatures must be echoed back with functionCall parts.
+    thought_signature: str | None = None
 
 
 class LLMMessage(BaseModel):
@@ -26,6 +28,8 @@ class LLMMessage(BaseModel):
     name: str | None = None
     tool_call_id: str | None = None
     tool_calls: list[LLMToolCall] | None = None
+    # Provider-native content parts (e.g. Gemini model parts with thoughtSignature).
+    provider_parts: list[dict[str, Any]] | None = None
 
 
 class LLMToolSpec(BaseModel):
@@ -43,6 +47,7 @@ class LLMCompletionResult(BaseModel):
     tool_calls: list[LLMToolCall] = Field(default_factory=list)
     finish_reason: str | None = None
     raw: dict[str, Any] | None = None
+    provider_parts: list[dict[str, Any]] | None = None
 
     @property
     def has_tool_calls(self) -> bool:

@@ -70,6 +70,7 @@ class LLMConversationAgent:
                             role="assistant",
                             content=completion.content,
                             tool_calls=completion.tool_calls,
+                            provider_parts=completion.provider_parts,
                         )
                     )
                     for call in completion.tool_calls:

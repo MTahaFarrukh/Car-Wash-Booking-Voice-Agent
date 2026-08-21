@@ -62,7 +62,7 @@ class TestGeminiProvider:
     def test_default_model(self):
         provider = GeminiProvider(api_key="test-key")
         assert provider.model == DEFAULT_GEMINI_MODEL
-        assert DEFAULT_GEMINI_MODEL == "gemini-2.5-flash"
+        assert DEFAULT_GEMINI_MODEL == "gemini-3.6-flash"
 
     def test_text_response_parsing(self):
         provider = GeminiProvider(api_key="test-key")
@@ -116,6 +116,45 @@ class TestGeminiProvider:
         assert contents[2]["role"] == "user"
         assert "functionResponse" in contents[2]["parts"][0]
 
+    def test_preserves_thought_signature_on_tool_roundtrip(self):
+        provider = GeminiProvider(api_key="test-key")
+        body = {
+            "candidates": [
+                {
+                    "content": {
+                        "role": "model",
+                        "parts": [
+                            {
+                                "functionCall": {
+                                    "name": "list_services",
+                                    "args": {"active_only": True},
+                                    "id": "fc1",
+                                },
+                                "thoughtSignature": "sig-abc",
+                            }
+                        ],
+                    },
+                    "finishReason": "STOP",
+                }
+            ]
+        }
+        parsed = provider._parse_response(body)
+        assert parsed.tool_calls[0].thought_signature == "sig-abc"
+        assert parsed.provider_parts[0]["thoughtSignature"] == "sig-abc"
+
+        system, contents = provider._serialize_messages(
+            [
+                LLMMessage(role="user", content="services?"),
+                LLMMessage(
+                    role="assistant",
+                    tool_calls=parsed.tool_calls,
+                    provider_parts=parsed.provider_parts,
+                ),
+            ]
+        )
+        assert contents[1]["parts"][0]["thoughtSignature"] == "sig-abc"
+        assert contents[1]["parts"][0]["functionCall"]["name"] == "list_services"
+
     def test_schema_cleaning_removes_unsupported_keys(self):
         provider = GeminiProvider(api_key="test-key")
         cleaned = provider._clean_parameters_schema(
@@ -124,18 +163,28 @@ class TestGeminiProvider:
                 "$schema": "https://json-schema.org/draft/2020-12/schema",
                 "type": "object",
                 "additionalProperties": False,
+                "$defs": {
+                    "BookingSource": {
+                        "type": "string",
+                        "enum": ["voice", "dashboard", "whatsapp"],
+                    }
+                },
                 "properties": {
                     "email": {
                         "anyOf": [{"type": "string"}, {"type": "null"}],
                         "title": "Email",
-                    }
+                    },
+                    "source": {"$ref": "#/$defs/BookingSource"},
                 },
             }
         )
         assert "title" not in cleaned
         assert "$schema" not in cleaned
         assert "additionalProperties" not in cleaned
+        assert "$defs" not in cleaned
+        assert "$ref" not in json.dumps(cleaned)
         assert cleaned["properties"]["email"]["type"] == "string"
+        assert cleaned["properties"]["source"]["enum"] == ["voice", "dashboard", "whatsapp"]
 
     def test_invalid_api_key_error(self):
         provider = GeminiProvider(api_key="bad")
@@ -196,7 +245,7 @@ class TestProviderSelection:
         settings = Settings.model_construct(
             llm_provider="gemini",
             gemini_api_key="gemini-test-key",
-            gemini_model="gemini-2.5-flash",
+            gemini_model="gemini-3.6-flash",
             llm_temperature=0.2,
             llm_max_tokens=500,
             llm_timeout_seconds=30,
@@ -204,7 +253,7 @@ class TestProviderSelection:
         provider = create_llm_provider(settings)
         assert isinstance(provider, GeminiProvider)
         assert provider.api_key == "gemini-test-key"
-        assert provider.model == "gemini-2.5-flash"
+        assert provider.model == "gemini-3.6-flash"
 
     def test_openai_still_works_when_selected(self):
         settings = Settings.model_construct(
@@ -227,7 +276,7 @@ class TestProviderSelection:
         settings = Settings.model_construct(
             llm_provider="gemini",
             gemini_api_key="gemini-key",
-            gemini_model="gemini-2.5-flash",
+            gemini_model="gemini-3.6-flash",
             llm_api_key="",
             llm_temperature=0.3,
             llm_max_tokens=800,

@@ -24,6 +24,6 @@ npm start
 # (Google AI Plus chat subscription is separate from Gemini API quota.)
 # LLM_PROVIDER=gemini
 # GEMINI_API_KEY=...
-# GEMINI_MODEL=gemini-2.5-flash
+# GEMINI_MODEL=gemini-3.6-flash
 # WHATSAPP_AGENT_MODE=auto
 # Without GEMINI_API_KEY, WhatsApp uses the Phase 6 rule-based agent.

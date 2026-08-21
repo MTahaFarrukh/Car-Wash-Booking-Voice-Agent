@@ -24,7 +24,7 @@ AgentIntegrationService
 |---|---|---|
 | `LLM_PROVIDER` | `gemini` | `gemini`, `openai`, or `none`/`off`/`rule` |
 | `GEMINI_API_KEY` | empty | Gemini developer API key (required for Gemini) |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini Flash model |
+| `GEMINI_MODEL` | `gemini-3.6-flash` | Gemini Flash model |
 | `LLM_API_KEY` | empty | OpenAI key (only when `LLM_PROVIDER=openai`) |
 | `LLM_MODEL` | `gpt-4o-mini` | OpenAI model |
 | `LLM_BASE_URL` | OpenAI URL | OpenAI-compatible base URL |
@@ -41,9 +41,11 @@ A Google AI Plus subscription does **not** automatically pay for Gemini API usag
 
 ## Default model
 
-`gemini-2.5-flash` — current Flash-class model suitable for conversational WhatsApp agents with function calling, low latency, and free-tier development. It is **not** Gemini 2.0 Flash.
+`gemini-3.6-flash` — current Flash-class model suitable for conversational WhatsApp agents with function calling and low latency.
 
-If your API key cannot access that model, set `GEMINI_MODEL` to another Flash model available to your key (for example a newer stable Flash release). A 404 returns a clear configuration error — the provider does not silently swap models.
+Note: `gemini-2.5-flash` is no longer available to new API keys (Google returns 404 and recommends `gemini-3.6-flash`).
+
+If your API key cannot access the configured model, set `GEMINI_MODEL` to another Flash model available to your key. A 404 returns a clear configuration error — the provider does not silently swap models.
 
 ## Interface
 

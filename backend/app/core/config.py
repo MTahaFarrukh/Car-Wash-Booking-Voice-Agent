@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.openai.com/v1"
     # Gemini (default provider)
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.6-flash"
     llm_temperature: float = 0.3
     llm_max_tokens: int = 800
     llm_timeout_seconds: float = 45.0

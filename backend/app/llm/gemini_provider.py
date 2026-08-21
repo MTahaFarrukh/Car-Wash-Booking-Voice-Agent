@@ -15,7 +15,7 @@ from app.llm.schemas import LLMCompletionResult, LLMMessage, LLMToolCall, LLMToo
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
 
 
@@ -151,31 +151,55 @@ class GeminiProvider(LLMProvider):
 
     @staticmethod
     def _clean_parameters_schema(schema: dict[str, Any]) -> dict[str, Any]:
-        """Convert JSON Schema from Pydantic into Gemini's OpenAPI-lite subset."""
+        """Convert JSON Schema from Pydantic into Gemini's OpenAPI-lite subset.
 
-        def scrub(node: Any) -> Any:
+        Gemini rejects `$ref` / `$defs`, so definitions are inlined first.
+        """
+        defs = schema.get("$defs") or schema.get("definitions") or {}
+
+        def resolve_ref(ref: str) -> Any:
+            # Example: "#/$defs/BookingSource"
+            name = ref.rsplit("/", 1)[-1]
+            target = defs.get(name)
+            if target is None:
+                return {"type": "string"}
+            return inline(target)
+
+        def inline(node: Any) -> Any:
             if isinstance(node, dict):
+                if "$ref" in node:
+                    return resolve_ref(str(node["$ref"]))
                 cleaned: dict[str, Any] = {}
                 for key, value in node.items():
-                    if key in {"title", "$schema", "additionalProperties", "examples", "default"}:
-                        continue
-                    if key == "$defs":
-                        # Inline defs are uncommon; drop to keep Gemini schemas simple.
+                    if key in {
+                        "title",
+                        "$schema",
+                        "$defs",
+                        "definitions",
+                        "additionalProperties",
+                        "examples",
+                        "default",
+                        "$id",
+                        "$ref",
+                    }:
                         continue
                     if key == "anyOf":
-                        # Simplify optional fields (T | None) to the non-null branch when possible.
-                        variants = [item for item in value if not (isinstance(item, dict) and item.get("type") == "null")]
+                        variants = [
+                            item
+                            for item in value
+                            if not (isinstance(item, dict) and item.get("type") == "null")
+                        ]
                         if len(variants) == 1:
-                            return scrub(variants[0])
-                        cleaned[key] = scrub(value)
+                            return inline(variants[0])
+                        cleaned[key] = inline(value)
                         continue
-                    cleaned[key] = scrub(value)
+                    cleaned[key] = inline(value)
                 return cleaned
             if isinstance(node, list):
-                return [scrub(item) for item in node]
+                return [inline(item) for item in node]
             return node
 
-        cleaned = scrub(schema)
+        cleaned = inline({k: v for k, v in schema.items() if k not in {"$defs", "definitions"}})
         if not isinstance(cleaned, dict):
             return {"type": "object", "properties": {}}
         cleaned.setdefault("type", "object")
@@ -196,19 +220,24 @@ class GeminiProvider(LLMProvider):
                 continue
 
             if message.role == "assistant":
+                # Gemini 3 requires exact model parts (including thoughtSignature) to be echoed back.
+                if message.provider_parts:
+                    contents.append({"role": "model", "parts": message.provider_parts})
+                    continue
                 parts: list[dict[str, Any]] = []
                 if message.content:
                     parts.append({"text": message.content})
                 for call in message.tool_calls or []:
-                    parts.append(
-                        {
-                            "functionCall": {
-                                "name": call.name,
-                                "args": call.arguments or {},
-                                "id": call.id or str(uuid.uuid4()),
-                            }
+                    part: dict[str, Any] = {
+                        "functionCall": {
+                            "name": call.name,
+                            "args": call.arguments or {},
+                            "id": call.id or str(uuid.uuid4()),
                         }
-                    )
+                    }
+                    if call.thought_signature:
+                        part["thoughtSignature"] = call.thought_signature
+                    parts.append(part)
                 if not parts:
                     parts.append({"text": ""})
                 contents.append({"role": "model", "parts": parts})
@@ -259,6 +288,7 @@ class GeminiProvider(LLMProvider):
         for part in parts:
             if not isinstance(part, dict):
                 continue
+            signature = part.get("thoughtSignature") or part.get("thought_signature")
             if "text" in part and part.get("text"):
                 text_chunks.append(str(part["text"]))
             function_call = part.get("functionCall")
@@ -276,6 +306,7 @@ class GeminiProvider(LLMProvider):
                         id=str(function_call.get("id") or uuid.uuid4()),
                         name=str(function_call.get("name") or ""),
                         arguments=args,
+                        thought_signature=str(signature) if signature else None,
                     )
                 )
 
@@ -285,4 +316,5 @@ class GeminiProvider(LLMProvider):
             tool_calls=tool_calls,
             finish_reason=finish_reason,
             raw=body,
+            provider_parts=parts if parts else None,
         )
