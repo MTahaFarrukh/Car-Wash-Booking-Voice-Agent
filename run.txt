@@ -18,3 +18,10 @@ copy .env.example .env
 npm install
 npm start
 # Scan the QR code, then send "Hi" from WhatsApp
+
+# Optional Phase 7 — LLM (add to root .env)
+# LLM_API_KEY=sk-...
+# LLM_PROVIDER=openai
+# LLM_MODEL=gpt-4o-mini
+# WHATSAPP_AGENT_MODE=auto
+# Without LLM_API_KEY, WhatsApp uses the Phase 6 rule-based agent.

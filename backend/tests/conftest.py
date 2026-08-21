@@ -10,6 +10,9 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 os.environ.setdefault("WHATSAPP_BRIDGE_SECRET", "test-bridge-secret")
+# Keep Phase 6 regression tests on the rule-based agent by default.
+os.environ.setdefault("WHATSAPP_AGENT_MODE", "rule")
+os.environ.setdefault("LLM_API_KEY", "")
 
 from app.core.config import get_settings
 

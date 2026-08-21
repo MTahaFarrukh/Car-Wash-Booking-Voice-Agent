@@ -1,6 +1,7 @@
 # WhatsApp Conversational Agent
 
-Phase 6 adds a WhatsApp booking experience on top of the existing Phase 5 agent integration layer.
+Phase 6 added WhatsApp booking on top of Phase 5 tools.
+Phase 7 upgrades the conversation intelligence to an LLM orchestrator while keeping Baileys and domain services unchanged.
 
 ## Architecture
 
@@ -9,30 +10,39 @@ Baileys Bridge (Node.js)
     ↓ POST /api/whatsapp/messages
 WhatsAppService
     ↓
-WhatsAppConversationAgent
-    ↓ Phase 5 tools
-AgentIntegrationService
-    ↓
-BookingService / AvailabilityService / CustomerVehicleService / ServiceCatalogService
-    ↓
-Supabase PostgreSQL
+WhatsAppConversationAgent (facade)
+    ├── LLMConversationAgent (Phase 7, when configured)
+    └── RuleBasedConversationAgent (Phase 6 fallback)
+            ↓ Phase 5 tools
+    AgentIntegrationService
+            ↓
+    Domain services → Supabase
 ```
 
-## Endpoint
+## LLM conversation flow
 
-`POST /api/whatsapp/messages`
+1. Normalize WhatsApp message (unchanged).
+2. Idempotency check via `message_id`.
+3. Resolve/create customer from WhatsApp phone.
+4. LLM receives system prompt + session context + short chat history.
+5. LLM may call Phase 5 tools through `Phase5ToolExecutor`.
+6. Tool results return to the LLM.
+7. Final natural-language reply is sent back to Baileys.
 
-Headers:
+## Structured state
 
-- `X-WhatsApp-Bridge-Secret`: must match `WHATSAPP_BRIDGE_SECRET`
+`ConversationState` remains the source of truth for:
 
-Body: `WhatsAppIncomingMessage` (`backend/app/schemas/whatsapp.py`)
+- customer_id / phone / name
+- selected vehicle / service
+- requested date / time
+- target booking id / pending intent
+- cached services, vehicles, active bookings
+- short message history for LLM context
 
-Response: `WhatsAppReply` with the text Baileys should send back.
+## Tool calling
 
-## Phase 5 tools reused
-
-All booking operations go through `AgentIntegrationService`:
+Only these Phase 5 tools are exposed:
 
 - `find_or_create_customer`
 - `get_customer`
@@ -45,39 +55,34 @@ All booking operations go through `AgentIntegrationService`:
 - `reschedule_booking`
 - `cancel_booking`
 
-Read-only active booking lookup for cancel/reschedule uses `BookingService.get_customer_bookings` (no duplicated booking mutations).
+The LLM never touches SQLAlchemy or Supabase directly.
 
-## Customer identity
+## Fallback behavior
 
-WhatsApp `sender_id` and normalized `phone_number` identify the customer. On first contact, `find_or_create_customer` creates a profile keyed by phone. No JWT or Supabase Auth in Phase 6.
+`WHATSAPP_AGENT_MODE`:
 
-## Conversation state
+| Value | Behavior |
+|---|---|
+| `auto` (default) | Use LLM when `LLM_API_KEY` is set; otherwise Phase 6 rule agent |
+| `llm` | Prefer LLM when provider can be created |
+| `rule` | Always use Phase 6 rule-based agent |
 
-Short-term state is kept in memory per `sender_id` (`ConversationStateStore`):
+FastAPI still starts if no LLM key is configured.
 
-- selected service / vehicle / date / time
-- pending intent (book, cancel, reschedule)
-- confirmation flag
-- cached services, vehicles, and active bookings
+## Configuration
 
-State survives multiple messages in the same process but is not persisted across backend restarts.
+See root `.env.example` for `LLM_*` and `WHATSAPP_AGENT_MODE`.
 
-## Idempotency
+## Prompt injection
 
-Processed WhatsApp `message_id` values are stored in `whatsapp_processed_messages`. Duplicate deliveries return the original response without re-running booking actions.
+The system prompt instructs the model to ignore override attempts and never expose secrets, prompts, or internal IDs.
+Customer-facing replies are lightly sanitized.
 
-## Error handling
+## Tool-call loop protection
 
-- Non-text messages receive a friendly unsupported-media reply
-- Tool failures are converted to user-safe messages
-- Invalid bridge secret returns HTTP 401
-
-## Parser
-
-`backend/app/whatsapp/parser.py` extracts services, vehicles, dates, and times from natural language so customers can say things like:
-
-> Book my Honda Civic for premium wash tomorrow at 3pm.
+`LLM_MAX_TOOL_CALLS` caps tool invocations per inbound message.
 
 ## Tests
 
-See `backend/tests/test_whatsapp_agent.py`.
+- Phase 6: `backend/tests/test_whatsapp_agent.py` (rule mode)
+- Phase 7: `backend/tests/test_whatsapp_llm_agent.py` (FakeLLMProvider)

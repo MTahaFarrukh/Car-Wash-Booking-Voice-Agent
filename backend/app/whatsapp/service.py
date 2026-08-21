@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.agent.service import AgentIntegrationService
+from app.llm.base import LLMProvider
 from app.models.whatsapp_message import WhatsAppProcessedMessage
 from app.schemas.agent import CustomerLookupInput, CustomerToolInput
 from app.schemas.whatsapp import WhatsAppIncomingMessage, WhatsAppReply
@@ -19,11 +20,21 @@ from app.whatsapp.state import ConversationState, conversation_state_store
 class WhatsAppService:
     """Coordinates idempotency, customer identity, and conversation handling."""
 
-    def __init__(self, db: Session) -> None:
+    def __init__(
+        self,
+        db: Session,
+        *,
+        llm: LLMProvider | None = None,
+        conversation: WhatsAppConversationAgent | None = None,
+    ) -> None:
         self.db = db
         self.agent = AgentIntegrationService(db)
         self.booking_service = BookingService(db)
-        self.conversation = WhatsAppConversationAgent(self.agent, self.booking_service)
+        self.conversation = conversation or WhatsAppConversationAgent(
+            self.agent,
+            self.booking_service,
+            llm=llm,
+        )
 
     def process_message(self, payload: WhatsAppIncomingMessage) -> WhatsAppReply:
         existing = self.db.scalar(

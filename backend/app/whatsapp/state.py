@@ -26,6 +26,8 @@ class ConversationState:
     cached_services: list[dict[str, Any]] = field(default_factory=list)
     cached_vehicles: list[dict[str, Any]] = field(default_factory=list)
     cached_active_bookings: list[dict[str, Any]] = field(default_factory=list)
+    # Short LLM chat history (role/content only; no secrets).
+    message_history: list[dict[str, str]] = field(default_factory=list)
 
 
 class ConversationStateStore:
