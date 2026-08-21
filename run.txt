@@ -27,3 +27,21 @@ npm start
 # GEMINI_MODEL=gemini-3.6-flash
 # WHATSAPP_AGENT_MODE=auto
 # Without GEMINI_API_KEY, WhatsApp uses the Phase 6 rule-based agent.
+
+# Optional Phase 8 / 8.1 — Voice booking (multi-provider)
+# VOICE_PROVIDER=vapi   # or uplift | fake | auto
+# VOICE_WEBHOOK_SECRET=change-me-to-a-long-random-string
+# VAPI_API_KEY=...
+# VAPI_ASSISTANT_ID=...
+# VAPI_WEBHOOK_SECRET=...
+# UPLIFT_API_KEY=...
+# UPLIFT_AGENT_ID=...
+# alembic upgrade head   # includes call_logs.provider
+# Manual voice smoke (no live phone required):
+#   GET  /api/voice/provider
+#   POST /api/voice/calls/start  (header X-Voice-Webhook-Secret)
+#   POST /api/voice/turns
+#   POST /api/voice/calls/end
+# VAPI Server URL: POST /api/voice/vapi/webhook
+# Uplift tool proxy: POST /api/voice/uplift/webhook
+# See backend/app/voice/README.md

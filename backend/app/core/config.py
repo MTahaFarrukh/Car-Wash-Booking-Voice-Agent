@@ -25,6 +25,15 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ""
     uplift_api_key: str = ""
     uplift_agent_id: str = ""
+    # Phase 8 / 8.1 — multi-provider voice
+    # vapi | uplift | fake | auto
+    voice_provider: str = "auto"
+    voice_webhook_secret: str = ""
+    uplift_webhook_secret: str = ""
+    # VAPI (optional — only required when VOICE_PROVIDER=vapi for live calls)
+    vapi_api_key: str = ""
+    vapi_assistant_id: str = ""
+    vapi_webhook_secret: str = ""
     cors_origins: str = "http://localhost:3000"
     environment: str = "development"
     whatsapp_bridge_secret: str = ""

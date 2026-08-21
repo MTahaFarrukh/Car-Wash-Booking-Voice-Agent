@@ -158,6 +158,9 @@ pytest tests/ -v
 | `NEXT_PUBLIC_API_URL` | Frontend | 1 |
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY` | Backend | 6 |
 | `UPLIFT_API_KEY`, `UPLIFT_AGENT_ID` | Backend | 8 |
+| `VAPI_API_KEY`, `VAPI_ASSISTANT_ID`, `VAPI_WEBHOOK_SECRET` | Backend voice (VAPI) | 8.1 |
+| `VOICE_PROVIDER`, `VOICE_WEBHOOK_SECRET` | Backend voice API | 8 / 8.1 |
+| `UPLIFT_WEBHOOK_SECRET` | Optional alias for voice webhook secret | 8 |
 
 See [`.env.example`](.env.example) for the full list.
 

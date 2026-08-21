@@ -13,6 +13,7 @@ from app.routers import (
     customers_router,
     services_router,
     vehicles_router,
+    voice_router,
     whatsapp_router,
 )
 
@@ -41,6 +42,7 @@ app.include_router(services_router)
 app.include_router(availability_router)
 app.include_router(bookings_router)
 app.include_router(whatsapp_router)
+app.include_router(voice_router)
 
 
 @app.get("/health")

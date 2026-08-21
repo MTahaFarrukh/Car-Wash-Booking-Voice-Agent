@@ -24,6 +24,7 @@ class CallLog(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     call_id: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=False)
+    provider: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     customer_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True
     )

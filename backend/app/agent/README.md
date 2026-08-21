@@ -40,7 +40,9 @@ Tool metadata lives in `app/agent/tools.py` and includes:
   - `data: object | null`
   - `error: { error_code, message, retryable, suggested_action } | null`
 
-This format is intentionally generic so future VAPI/WhatsApp/Uplift/OpenAI integrations can map it to their own tool-call payloads.
+This format is intentionally generic so WhatsApp, Uplift/voice, and other adapters can map it to their own tool-call payloads.
+
+See also: `app/whatsapp/` (Phase 6–7) and `app/voice/` (Phase 8).
 
 ## Error handling
 

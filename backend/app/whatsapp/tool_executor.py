@@ -103,8 +103,14 @@ def get_llm_tool_specs() -> list[LLMToolSpec]:
 class Phase5ToolExecutor:
     """Dispatch LLM tool calls to AgentIntegrationService only."""
 
-    def __init__(self, agent: AgentIntegrationService) -> None:
+    def __init__(
+        self,
+        agent: AgentIntegrationService,
+        *,
+        booking_source: BookingSource = BookingSource.WHATSAPP,
+    ) -> None:
         self.agent = agent
+        self.booking_source = booking_source
         self._handlers: dict[str, Callable[[Any], AgentResult]] = {
             "find_or_create_customer": self.agent.find_or_create_customer,
             "get_customer": self.agent.get_customer,
@@ -161,7 +167,7 @@ class Phase5ToolExecutor:
         if name == "find_or_create_customer" and state.phone and not arguments.get("phone"):
             arguments["phone"] = state.phone
         if name == "create_booking":
-            arguments["source"] = BookingSource.WHATSAPP.value
+            arguments["source"] = self.booking_source.value
             if state.selected_vehicle_id and not arguments.get("vehicle_id"):
                 arguments["vehicle_id"] = str(state.selected_vehicle_id)
             if state.selected_service_id and not arguments.get("service_id"):
