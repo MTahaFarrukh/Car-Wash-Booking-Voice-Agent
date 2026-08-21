@@ -28,11 +28,11 @@ from app.voice.service import VoiceConversationService
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/voice", tags=["voice"])
-settings = get_settings()
 
 
 def verify_voice_secret(x_voice_webhook_secret: str = Header(...)) -> None:
-    expected = (settings.voice_webhook_secret or settings.uplift_webhook_secret or "").strip()
+    cfg = get_settings()
+    expected = (cfg.voice_webhook_secret or cfg.uplift_webhook_secret or "").strip()
     if not expected:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

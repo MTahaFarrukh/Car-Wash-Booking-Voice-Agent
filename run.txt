@@ -1,47 +1,106 @@
-# Terminal 1 — Backend
+# ============================================================
+# Sparkle Car Wash — how to start everything (Windows PowerShell)
+# Repo root: carwash-booking/
+# ============================================================
+# Open ONE terminal per section below. Keep them all running.
+# Root .env holds secrets (never commit it). Copy from .env.example first time.
+# ============================================================
+
+
+# ------------------------------------------------------------
+# ONE-TIME SETUP (only if new machine / fresh clone)
+# ------------------------------------------------------------
+# cd backend
+# .\venv\Scripts\activate          # or: python -m venv venv
+# pip install -r requirements.txt
+# alembic upgrade head
+# python -m scripts.seed
+#
+# cd ..\frontend
+# npm install
+#
+# cd ..\whatsapp-bridge
+# copy .env.example .env           # set WHATSAPP_BRIDGE_SECRET to match root .env
+# npm install
+#
+# ngrok: install to C:\ngrok\ngrok.exe and run once:
+#   C:\ngrok\ngrok.exe config add-authtoken <your-token>
+
+
+# ------------------------------------------------------------
+# Terminal 1 — Backend (FastAPI)  REQUIRED
+# ------------------------------------------------------------
 cd backend
 .\venv\Scripts\activate
-
-# First-time database setup (Phase 2 + Phase 6 WhatsApp migration)
 alembic upgrade head
-python -m scripts.seed
-
 uvicorn app.main:app --reload --port 8000
 
-# Terminal 2 — Frontend
+# Health check: http://127.0.0.1:8000/health
+# Voice status:  http://127.0.0.1:8000/api/voice/provider
+# If port 8000 is stuck, use --port 8001 and point ngrok at 8001 instead.
+
+
+# ------------------------------------------------------------
+# Terminal 2 — Frontend (Next.js)  OPTIONAL for dashboard/UI
+# ------------------------------------------------------------
 cd frontend
 npm run dev
+# Open http://localhost:3000
 
-# Terminal 3 — WhatsApp bridge (Phase 6)
+
+# ------------------------------------------------------------
+# Terminal 3 — WhatsApp bridge (Baileys)  OPTIONAL for WhatsApp
+# ------------------------------------------------------------
 cd whatsapp-bridge
-copy .env.example .env
-npm install
 npm start
-# Scan the QR code, then send "Hi" from WhatsApp
+# Scan QR once. Bridge posts to backend /api/whatsapp/messages
+# Needs root .env: WHATSAPP_BRIDGE_SECRET, GEMINI_API_KEY, WHATSAPP_AGENT_MODE=auto
 
-# Optional Phase 7.1 — Gemini LLM (add to root .env)
-# Get a developer API key from https://aistudio.google.com/apikey
-# (Google AI Plus chat subscription is separate from Gemini API quota.)
-# LLM_PROVIDER=gemini
-# GEMINI_API_KEY=...
-# GEMINI_MODEL=gemini-3.6-flash
-# WHATSAPP_AGENT_MODE=auto
-# Without GEMINI_API_KEY, WhatsApp uses the Phase 6 rule-based agent.
 
-# Optional Phase 8 / 8.1 — Voice booking (multi-provider)
-# VOICE_PROVIDER=vapi   # or uplift | fake | auto
-# VOICE_WEBHOOK_SECRET=change-me-to-a-long-random-string
-# VAPI_API_KEY=...
-# VAPI_ASSISTANT_ID=...
-# VAPI_WEBHOOK_SECRET=...
+# ------------------------------------------------------------
+# Terminal 4 — ngrok (public URL for VAPI webhooks)  OPTIONAL for voice
+# ------------------------------------------------------------
+C:\ngrok\ngrok.exe http 8000
+# Copy the https://….ngrok-free.app URL from the ngrok UI / terminal.
+# Free URLs change when you restart ngrok — update VAPI each time.
+
+
+# ------------------------------------------------------------
+# VAPI voice wiring (after Terminals 1 + 4 are up)
+# ------------------------------------------------------------
+# In root .env:
+#   VOICE_PROVIDER=vapi
+#   VAPI_API_KEY=...
+#   VAPI_ASSISTANT_ID=...
+#   VAPI_WEBHOOK_SECRET=...
+# Restart Terminal 1 after changing .env
+#
+# In VAPI Dashboard → Assistant → Server URL:
+#   https://<ngrok-host>/api/voice/vapi/webhook
+# Auth: Bearer token = same value as VAPI_WEBHOOK_SECRET
+# (Do NOT use VAPI_API_KEY for webhook auth.)
+#
+# Self-check:
+#   GET  http://127.0.0.1:8000/api/voice/provider
+#   Should show active_provider=vapi, configured=true
+
+
+# ------------------------------------------------------------
+# Uplift voice (alternative) — set VOICE_PROVIDER=uplift
+# ------------------------------------------------------------
 # UPLIFT_API_KEY=...
 # UPLIFT_AGENT_ID=...
-# alembic upgrade head   # includes call_logs.provider
-# Manual voice smoke (no live phone required):
-#   GET  /api/voice/provider
-#   POST /api/voice/calls/start  (header X-Voice-Webhook-Secret)
-#   POST /api/voice/turns
-#   POST /api/voice/calls/end
-# VAPI Server URL: POST /api/voice/vapi/webhook
-# Uplift tool proxy: POST /api/voice/uplift/webhook
+# VOICE_WEBHOOK_SECRET=...
+# Tool handlers proxy to: POST /api/voice/uplift/webhook
 # See backend/app/voice/README.md
+
+
+# ------------------------------------------------------------
+# Useful .env keys (root .env)
+# ------------------------------------------------------------
+# DATABASE_URL, SUPABASE_*
+# WHATSAPP_BRIDGE_SECRET, WHATSAPP_AGENT_MODE
+# LLM_PROVIDER=gemini, GEMINI_API_KEY, GEMINI_MODEL=gemini-3.6-flash
+# VOICE_PROVIDER=vapi|uplift|fake|auto
+# VAPI_API_KEY, VAPI_ASSISTANT_ID, VAPI_WEBHOOK_SECRET
+# UPLIFT_API_KEY, UPLIFT_AGENT_ID, VOICE_WEBHOOK_SECRET
