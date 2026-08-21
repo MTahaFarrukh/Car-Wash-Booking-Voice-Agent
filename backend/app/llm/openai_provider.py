@@ -9,13 +9,13 @@ from typing import Any
 import httpx
 
 from app.llm.base import LLMProvider
+from app.llm.errors import LLMProviderError
 from app.llm.schemas import LLMCompletionResult, LLMMessage, LLMToolCall, LLMToolSpec
 
 logger = logging.getLogger(__name__)
 
-
-class LLMProviderError(Exception):
-    """Raised when the LLM provider fails."""
+# Re-export for existing imports.
+__all__ = ["LLMProviderError", "OpenAIProvider"]
 
 
 class OpenAIProvider(LLMProvider):

@@ -11,7 +11,7 @@ from datetime import date
 from app.agent.service import AgentIntegrationService
 from app.core.config import Settings, get_settings
 from app.llm.base import LLMProvider
-from app.llm.openai_provider import LLMProviderError
+from app.llm.errors import LLMProviderError
 from app.llm.schemas import LLMMessage, LLMToolCall
 from app.models.booking import BookingStatus
 from app.schemas.agent import ServicesListInput, VehicleLookupInput

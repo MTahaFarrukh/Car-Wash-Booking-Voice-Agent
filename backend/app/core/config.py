@@ -29,11 +29,16 @@ class Settings(BaseSettings):
     environment: str = "development"
     whatsapp_bridge_secret: str = ""
 
-    # Phase 7 — LLM WhatsApp agent
-    llm_provider: str = "openai"
+    # Phase 7 / 7.1 — LLM WhatsApp agent
+    # gemini (default) | openai | none/off/rule
+    llm_provider: str = "gemini"
+    # OpenAI (optional)
     llm_api_key: str = ""
     llm_model: str = "gpt-4o-mini"
     llm_base_url: str = "https://api.openai.com/v1"
+    # Gemini (default provider)
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
     llm_temperature: float = 0.3
     llm_max_tokens: int = 800
     llm_timeout_seconds: float = 45.0
@@ -48,7 +53,13 @@ class Settings(BaseSettings):
     @property
     def llm_is_configured(self) -> bool:
         provider = (self.llm_provider or "").strip().lower()
-        return bool(self.llm_api_key) and provider not in {"", "none", "off", "rule"}
+        if provider in {"", "none", "off", "rule"}:
+            return False
+        if provider == "gemini":
+            return bool((self.gemini_api_key or "").strip())
+        if provider in {"openai", "openai-compatible"}:
+            return bool((self.llm_api_key or "").strip())
+        return False
 
 
 @lru_cache

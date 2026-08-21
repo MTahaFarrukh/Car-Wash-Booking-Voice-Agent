@@ -10,8 +10,8 @@ from sqlalchemy import select
 
 from app.agent.service import AgentIntegrationService
 from app.core.config import Settings
+from app.llm.errors import LLMProviderError
 from app.llm.fake import FakeLLMProvider
-from app.llm.openai_provider import LLMProviderError
 from app.llm.schemas import LLMCompletionResult, LLMToolCall
 from app.models.booking import BookingSource
 from app.models.customer import Customer

@@ -19,9 +19,11 @@ npm install
 npm start
 # Scan the QR code, then send "Hi" from WhatsApp
 
-# Optional Phase 7 — LLM (add to root .env)
-# LLM_API_KEY=sk-...
-# LLM_PROVIDER=openai
-# LLM_MODEL=gpt-4o-mini
+# Optional Phase 7.1 — Gemini LLM (add to root .env)
+# Get a developer API key from https://aistudio.google.com/apikey
+# (Google AI Plus chat subscription is separate from Gemini API quota.)
+# LLM_PROVIDER=gemini
+# GEMINI_API_KEY=...
+# GEMINI_MODEL=gemini-2.5-flash
 # WHATSAPP_AGENT_MODE=auto
-# Without LLM_API_KEY, WhatsApp uses the Phase 6 rule-based agent.
+# Without GEMINI_API_KEY, WhatsApp uses the Phase 6 rule-based agent.

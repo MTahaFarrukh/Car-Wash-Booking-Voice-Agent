@@ -71,7 +71,9 @@ FastAPI still starts if no LLM key is configured.
 
 ## Configuration
 
-See root `.env.example` for `LLM_*` and `WHATSAPP_AGENT_MODE`.
+See root `.env.example` for `LLM_*`, `GEMINI_*`, and `WHATSAPP_AGENT_MODE`.
+
+Default LLM provider is **Gemini** (`LLM_PROVIDER=gemini`). Set `GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/apikey). Google AI Plus (consumer) is separate from Gemini API developer quota.
 
 ## Prompt injection
 
