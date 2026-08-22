@@ -1,169 +1,153 @@
-# Sparkle AI Receptionist (carwash-ai)
+# Sparkle Car Wash — AI Booking Platform
 
-AI-powered car wash receptionist and booking platform — a monorepo with a Next.js frontend and FastAPI backend backed by PostgreSQL (Supabase).
+Monorepo for **Sparkle Car Wash**: book, reschedule, and cancel washes through a shared booking engine, with WhatsApp (Gemini) and voice (VAPI / Uplift) on top.
 
-**Phase 1** delivers the project foundation: health endpoints, SQLAlchemy models, Alembic config, and a minimal landing page.
+> Day-to-day startup commands live in [`run.txt`](run.txt). This README is the project overview — a fuller write-up can wait until the final pass.
 
-**Phase 2** adds Alembic migrations, database indexes, and idempotent development seed data.
+---
 
-**Phase 3** adds the booking domain layer: `BookingService`, `AvailabilityService`, slot engine, conflict detection, and unit tests.
+## What’s built
 
-REST APIs, dashboard UI, auth, and voice integration arrive in later phases.
+| Area | Status |
+|------|--------|
+| Booking domain (services, availability, create / reschedule / cancel) | Done |
+| REST API + Next.js frontend | Done |
+| WhatsApp bridge (Baileys) + Gemini tool-calling agent | Done |
+| Voice channel (Phase 8) + VAPI / Uplift adapters (8.1) | Done — live VAPI booking verified |
+| Shared Phase 5 tool layer (no second booking engine) | Done |
 
-## Project structure
+Voice and WhatsApp both call the same agent tools. VAPI’s **Save Booking** tool maps into that layer via aliases on the backend.
+
+---
+
+## Repo layout
 
 ```
-carwash-ai/
-├── frontend/          # Next.js App Router + TypeScript + Tailwind + shadcn/ui
-├── backend/
-│   ├── app/           # FastAPI application
-│   ├── alembic/       # Database migrations
-│   └── scripts/       # Development seed scripts
-├── .env.example       # Shared environment template
+carwash-booking/
+├── backend/                 # FastAPI, Alembic, domain + agents
+│   ├── app/
+│   │   ├── agent/           # Phase 5 booking tools
+│   │   ├── whatsapp/        # WhatsApp conversation + LLM agent
+│   │   ├── voice/           # Voice agent + VAPI / Uplift providers
+│   │   ├── llm/             # Gemini / OpenAI / fake providers
+│   │   └── routers/         # HTTP API
+│   ├── alembic/
+│   ├── scripts/             # Seed data
+│   └── tests/
+├── frontend/                # Next.js dashboard / UI
+├── whatsapp-bridge/         # Baileys → backend message bridge
+├── .env.example             # Env template (copy to `.env`)
+├── run.txt                  # How to start everything (Windows)
 └── README.md
 ```
+
+Deeper notes:
+
+- [`backend/app/voice/README.md`](backend/app/voice/README.md) — voice providers & webhooks  
+- [`backend/app/whatsapp/README.md`](backend/app/whatsapp/README.md) — WhatsApp agent  
+- [`whatsapp-bridge/README.md`](whatsapp-bridge/README.md) — Baileys bridge  
+
+---
 
 ## Prerequisites
 
 - **Node.js** 18+
 - **Python** 3.11+
-- **PostgreSQL** (local install or Supabase connection string)
+- **PostgreSQL** (local or Supabase `DATABASE_URL`)
+- Optional: **ngrok** (VAPI webhooks), Gemini API key (WhatsApp LLM), VAPI / Uplift credentials (voice)
+
+---
 
 ## Quick start
 
 ### 1. Environment
 
-Copy the root environment template and fill in your values (especially `DATABASE_URL`):
-
 ```powershell
 copy .env.example .env
-```
-
-For the frontend:
-
-```powershell
 copy frontend\.env.local.example frontend\.env.local
 ```
 
-### 2. Backend
+Fill in at least `DATABASE_URL`. For WhatsApp / voice, set the keys listed under [Environment](#environment).
+
+### 2. Backend (one-time)
 
 ```powershell
 cd backend
 python -m venv venv
-venv\Scripts\activate
+.\venv\Scripts\activate
 pip install -r requirements.txt
-```
-
-### 3. Database migrations (Phase 2)
-
-Ensure PostgreSQL is running and `DATABASE_URL` in the root `.env` is valid (local Postgres or Supabase direct connection string).
-
-```powershell
-cd backend
-venv\Scripts\activate
 alembic upgrade head
-```
-
-Verify migration:
-
-```powershell
-alembic downgrade -1
-alembic upgrade head
-```
-
-### 4. Seed development data (Phase 2)
-
-```powershell
 python -m scripts.seed
 ```
 
-The seed script is idempotent — it skips if data already exists. To inspect counts after seeding:
+### 3. Run day-to-day
 
-```powershell
-python -m scripts.seed --verify
-```
+Use [`run.txt`](run.txt) — typically:
 
-### 5. Run backend
+1. **Backend** — `uvicorn` on port `8000`  
+2. **Frontend** — `npm run dev` (optional)  
+3. **WhatsApp bridge** — `npm start` in `whatsapp-bridge/` (optional)  
+4. **ngrok** — `ngrok http 8000` for VAPI (optional)
 
-```powershell
-uvicorn app.main:app --reload --port 8000
-```
+Checks:
 
-Verify:
+- Health: `http://127.0.0.1:8000/health`  
+- API docs: `http://127.0.0.1:8000/docs`  
+- Voice provider: `http://127.0.0.1:8000/api/voice/provider`  
+- Frontend: `http://localhost:3000`
 
-- `GET http://localhost:8000/health` → `{ "status": "ok" }`
-- `GET http://localhost:8000/health/db` → `{ "database": "connected" }` (requires valid `DATABASE_URL`)
-- API docs at `http://localhost:8000/docs`
-
-### 6. Frontend
-
-In a new terminal:
-
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-Open `http://localhost:3000` — the landing page shows live backend and database health status.
-
-Production build check:
-
-```powershell
-npm run build
-```
-
-## Phase 3 scope
-
-| Included | Deferred |
-|----------|----------|
-| `AvailabilityService` — slot generation, conflict detection, `check_availability()` | REST API routers (Phase 4) |
-| `BookingService` — create, reschedule, cancel, get, list | Dashboard UI (Phase 5) |
-| Pure slot engine + domain exceptions | AI tools / Uplift (Phases 7–8) |
-| Unit tests (`pytest tests/`) | |
-
-Run tests:
+### 4. Tests
 
 ```powershell
 cd backend
-venv\Scripts\activate
-pytest tests/ -v
+.\venv\Scripts\activate
+pytest tests/ -q
 ```
 
-## Phase 2 scope
+---
 
-| Included | Deferred |
-|----------|----------|
-| Initial Alembic migration (`f8a2b1c3d4e5`) | REST API routers (Phase 4) |
-| Indexes on booking status, dates, customer phone, call start time | Dashboard pages (Phase 5) |
-| Idempotent seed script (`python -m scripts.seed`) | Supabase Auth (Phase 6) |
-| Sample business data (Sparkle Car Wash) | AI tools and Uplift integration (Phases 7–8) |
+## Channels
 
-## Phase 1 scope
+### WhatsApp
 
-| Included | Deferred |
-|----------|----------|
-| Monorepo layout and env scaffolding | Migrations and seed data (Phase 2) |
-| FastAPI `/health` and `/health/db` | Booking service and REST routers (Phases 3–4) |
-| SQLAlchemy models (User, Customer, Vehicle, Service, Booking, Availability, CallLog) | Dashboard pages (Phase 5) |
-| Alembic config (no migrations yet) | Supabase Auth (Phase 6) |
-| Next.js landing page with health UI | AI tools and Uplift integration (Phases 7–8) |
+1. Start backend + `whatsapp-bridge`  
+2. Scan QR once  
+3. Needs `WHATSAPP_BRIDGE_SECRET`, `GEMINI_API_KEY`, `WHATSAPP_AGENT_MODE=auto`  
 
-## Environment variables
+### Voice (VAPI)
 
-| Variable | Used by | Phase |
-|----------|---------|-------|
-| `DATABASE_URL` | Backend | 1 |
-| `CORS_ORIGINS` | Backend | 1 |
-| `NEXT_PUBLIC_API_URL` | Frontend | 1 |
-| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | Backend | 6 |
-| `UPLIFT_API_KEY`, `UPLIFT_AGENT_ID` | Backend | 8 |
-| `VAPI_API_KEY`, `VAPI_ASSISTANT_ID`, `VAPI_WEBHOOK_SECRET` | Backend voice (VAPI) | 8.1 |
-| `VOICE_PROVIDER`, `VOICE_WEBHOOK_SECRET` | Backend voice API | 8 / 8.1 |
-| `UPLIFT_WEBHOOK_SECRET` | Optional alias for voice webhook secret | 8 |
+1. Start backend + ngrok  
+2. Set `VOICE_PROVIDER=vapi` and VAPI keys in root `.env`  
+3. In VAPI, tool / assistant **Server URL**:
 
-See [`.env.example`](.env.example) for the full list.
+   `https://<ngrok-host>/api/voice/vapi/webhook`
+
+4. Auth: **Bearer** = `VAPI_WEBHOOK_SECRET` (not `VAPI_API_KEY`)  
+5. Free ngrok URLs change on restart — update VAPI when they do  
+
+Uplift: set `VOICE_PROVIDER=uplift` and see the voice README.
+
+---
+
+## Environment
+
+| Variable | Purpose |
+|----------|---------|
+| `DATABASE_URL` | Postgres / Supabase |
+| `CORS_ORIGINS` | Allowed frontend origins |
+| `NEXT_PUBLIC_API_URL` | Frontend → API base URL |
+| `SUPABASE_*` | Supabase project keys |
+| `WHATSAPP_BRIDGE_SECRET` | Bridge ↔ backend auth |
+| `WHATSAPP_AGENT_MODE` | `auto` / `llm` / `rule` |
+| `LLM_PROVIDER`, `GEMINI_API_KEY`, `GEMINI_MODEL` | WhatsApp LLM |
+| `VOICE_PROVIDER` | `vapi` \| `uplift` \| `fake` \| `auto` |
+| `VAPI_API_KEY`, `VAPI_ASSISTANT_ID`, `VAPI_WEBHOOK_SECRET` | VAPI |
+| `UPLIFT_API_KEY`, `UPLIFT_AGENT_ID`, `VOICE_WEBHOOK_SECRET` | Uplift / shared voice secret |
+
+Full template: [`.env.example`](.env.example). **Never commit** `.env`.
+
+---
 
 ## License
 
-Private project — not for public distribution.
+Private course project — not for public distribution.
