@@ -336,6 +336,129 @@ class TestProviderCallLogging:
         assert log.provider == "uplift"
 
 
+@requires_database
+class TestVapiSaveBookingPolish:
+    def test_save_booking_uses_requested_service_and_links_call_log(self, db_session):
+        """Dynamic service (Basic Wash) + CallLog.booking_id linked on success."""
+        from datetime import date, time, timedelta
+
+        from app.models.booking import Booking, BookingSource
+        from app.models.call_log import CallOutcome
+        from app.models.service import Service
+        from app.services.availability_service import AvailabilityService
+        from app.voice.normalized import NormalizedVoiceEvent, NormalizedVoiceToolCall
+
+        basic = db_session.scalar(select(Service).where(Service.name == "Basic Wash"))
+        assert basic is not None
+        availability = AvailabilityService(db_session)
+        booking_date = None
+        booking_time = None
+        for days_ahead in range(14, 90):
+            candidate = date.today() + timedelta(days=days_ahead)
+            while candidate.weekday() > 4:
+                candidate += timedelta(days=1)
+            slots = availability.get_available_slots(candidate, basic.id)
+            if slots:
+                booking_date, booking_time = candidate, slots[0]
+                break
+        assert booking_date and booking_time
+
+        fake_llm = FakeLLMProvider([])
+        agent = AgentIntegrationService(db_session)
+        booking_svc = BookingService(db_session)
+        conversation = VoiceConversationAgent(agent, booking_svc, fake_llm, settings=_settings())
+        service = VoiceConversationService(
+            db_session,
+            llm=fake_llm,
+            voice_provider=VapiVoiceProvider(_settings(vapi_api_key="k", vapi_assistant_id="a")),
+            settings=_settings(voice_provider="vapi"),
+            conversation=conversation,
+        )
+        call_id = f"vapi-save-{uuid.uuid4().hex[:10]}"
+        phone = f"+92322{uuid.uuid4().hex[:8]}"
+        service.start_call(
+            VoiceCallStartRequest(call_id=call_id, caller_phone=phone, provider="vapi")
+        )
+
+        summary = service.handle_normalized_events(
+            [
+                NormalizedVoiceEvent(
+                    event_type="tool.execute",
+                    call_id=call_id,
+                    provider="vapi",
+                    caller_phone=phone,
+                    tool_calls=[
+                        NormalizedVoiceToolCall(
+                            id="call_test_save_1",
+                            name="Save Booking",
+                            arguments={
+                                "name": "Taha",
+                                "phone": phone,
+                                "vehicle": "Suzuki Swift",
+                                "date": booking_date.isoformat(),
+                                "time": booking_time.strftime("%H:%M"),
+                                "service": "Basic Wash",
+                            },
+                        )
+                    ],
+                )
+            ]
+        )
+        assert summary["tool_results"]
+        result = summary["tool_results"][0]["result"]
+        assert result.get("success") is True, result
+
+        booking_id = (result.get("data") or {}).get("booking", {}).get("booking_id")
+        assert booking_id
+        booking = db_session.get(Booking, uuid.UUID(str(booking_id)))
+        assert booking is not None
+        assert booking.service_id == basic.id
+        assert booking.source == BookingSource.VOICE
+
+        log = db_session.scalar(select(CallLog).where(CallLog.call_id == call_id))
+        assert log is not None
+        assert log.booking_id == booking.id
+        assert log.outcome == CallOutcome.BOOKING_CREATED
+        assert log.provider == "vapi"
+
+    def test_save_booking_without_service_asks_for_catalog_choice(self, db_session):
+        fake_llm = FakeLLMProvider([])
+        agent = AgentIntegrationService(db_session)
+        booking_svc = BookingService(db_session)
+        conversation = VoiceConversationAgent(agent, booking_svc, fake_llm, settings=_settings())
+        service = VoiceConversationService(
+            db_session,
+            llm=fake_llm,
+            voice_provider=VapiVoiceProvider(_settings(vapi_api_key="k", vapi_assistant_id="a")),
+            settings=_settings(voice_provider="vapi"),
+            conversation=conversation,
+        )
+        call_id = f"vapi-nosvc-{uuid.uuid4().hex[:10]}"
+        phone = f"+92323{uuid.uuid4().hex[:8]}"
+        service.start_call(
+            VoiceCallStartRequest(call_id=call_id, caller_phone=phone, provider="vapi")
+        )
+        executed = service.execute_tool(
+            VoiceToolExecuteRequest(
+                call_id=call_id,
+                name="save_booking",
+                arguments={
+                    "name": "Taha",
+                    "phone": phone,
+                    "vehicle": "Civic",
+                    "date": "2026-09-01",
+                    "time": "10:00",
+                },
+                caller_phone=phone,
+            )
+        )
+        assert executed.success is False
+        assert executed.result.get("success") is False
+        assert "service" in (executed.presentation_instructions or "").lower() or "Basic Wash" in (
+            executed.presentation_instructions or ""
+        )
+
+
 class TestProviderHttpWebhooks:
     def test_vapi_webhook_rejects_bad_auth(self):
         get_settings.cache_clear()

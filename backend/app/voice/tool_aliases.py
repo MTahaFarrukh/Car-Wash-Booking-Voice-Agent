@@ -113,6 +113,107 @@ def _parse_vehicle(args: dict[str, Any]) -> tuple[str, str, str]:
     return make, model, vtype
 
 
+def _service_catalog_names(service_rows: list[dict[str, Any]]) -> list[str]:
+    names: list[str] = []
+    for row in service_rows:
+        name = str(row.get("name") or "").strip()
+        if name:
+            names.append(name)
+    return names
+
+
+def _match_service_row(
+    service_rows: list[dict[str, Any]],
+    hint: str,
+) -> dict[str, Any] | None:
+    """Match a caller/tool service hint against the live catalog (no hardcoded default)."""
+    cleaned = re.sub(r"\s+", " ", (hint or "").strip().lower())
+    if not cleaned:
+        return None
+
+    # Exact name match
+    for row in service_rows:
+        name = str(row.get("name") or "").strip()
+        if name.lower() == cleaned:
+            return row
+
+    # Substring either direction (e.g. "basic" ↔ "Basic Wash")
+    substring_hits = [
+        row
+        for row in service_rows
+        if cleaned in str(row.get("name") or "").lower()
+        or str(row.get("name") or "").lower() in cleaned
+    ]
+    if len(substring_hits) == 1:
+        return substring_hits[0]
+    if len(substring_hits) > 1:
+        # Prefer the shortest name that still contains the hint (more specific)
+        substring_hits.sort(key=lambda r: len(str(r.get("name") or "")))
+        return substring_hits[0]
+
+    # Token / synonym match against catalog names (driven by live rows, not fixed Premium)
+    tokens = {t for t in re.split(r"[^a-z0-9]+", cleaned) if t and t not in {"wash", "the", "a", "an"}}
+    if "interior" in tokens or "detail" in tokens or "detailing" in tokens:
+        tokens.update({"detailing", "detail", "full"})
+    if "premium" in tokens or "deluxe" in tokens:
+        tokens.add("premium")
+    if "basic" in tokens or "standard" in tokens or "exterior" in tokens:
+        tokens.add("basic")
+
+    scored: list[tuple[int, dict[str, Any]]] = []
+    for row in service_rows:
+        name_l = str(row.get("name") or "").lower()
+        name_tokens = {t for t in re.split(r"[^a-z0-9]+", name_l) if t}
+        overlap = len(tokens & name_tokens)
+        if overlap:
+            scored.append((overlap, row))
+    if not scored:
+        return None
+    scored.sort(key=lambda item: (-item[0], len(str(item[1].get("name") or ""))))
+    best_score = scored[0][0]
+    best_rows = [row for score, row in scored if score == best_score]
+    return best_rows[0] if len(best_rows) == 1 else best_rows[0]
+
+
+def _resolve_service(
+    service_rows: list[dict[str, Any]],
+    args: dict[str, Any],
+    state: CallSessionState,
+) -> tuple[dict[str, Any] | None, str | None]:
+    """
+    Resolve service from tool args or prior session selection.
+
+    Returns (row, error_spoken). Never assumes Premium Wash.
+    """
+    hint = str(
+        _pick(args, "service", "service_name", "wash_type", "service_type", "package") or ""
+    ).strip()
+
+    if not hint and state.selected_service_id is not None:
+        sid = str(state.selected_service_id)
+        for row in service_rows:
+            if str(row.get("service_id")) == sid:
+                return row, None
+    if not hint and state.selected_service_name:
+        hint = state.selected_service_name
+
+    if not hint:
+        names = _service_catalog_names(service_rows)
+        spoken = "Which service should I book?"
+        if names:
+            spoken = f"Which service should I book: {', '.join(names)}?"
+        return None, spoken
+
+    matched = _match_service_row(service_rows, hint)
+    if matched is None:
+        names = _service_catalog_names(service_rows)
+        spoken = f"I couldn't match that to a service. We offer {', '.join(names)}." if names else (
+            "I couldn't match that to a service."
+        )
+        return None, spoken
+    return matched, None
+
+
 def execute_save_booking(
     agent: AgentIntegrationService,
     state: CallSessionState,
@@ -128,7 +229,6 @@ def execute_save_booking(
     name = str(_pick(args, "name", "customer_name", "caller_name") or state.customer_name or "Voice Caller").strip()
     booking_date = _parse_date(_pick(args, "booking_date", "preferred_date", "date"))
     booking_time = _parse_time(_pick(args, "booking_time", "preferred_time", "time"))
-    service_hint = str(_pick(args, "service", "service_name", "wash_type") or "Premium Wash").strip()
 
     if not phone:
         return (
@@ -195,25 +295,21 @@ def execute_save_booking(
             "I couldn't load our wash services right now.",
         )
     service_rows = services.data["services"]
-    service_id = None
-    service_name = None
-    hint_l = service_hint.lower()
-    for row in service_rows:
-        row_name = str(row.get("name") or "")
-        if hint_l in row_name.lower() or row_name.lower() in hint_l:
-            service_id = uuid_from_string(row["service_id"])
-            service_name = row_name
-            break
-    if service_id is None:
-        # Prefer Premium Wash when unspecified
-        for row in service_rows:
-            if "premium" in str(row.get("name") or "").lower():
-                service_id = uuid_from_string(row["service_id"])
-                service_name = row.get("name")
-                break
-    if service_id is None:
-        service_id = uuid_from_string(service_rows[0]["service_id"])
-        service_name = service_rows[0].get("name")
+    matched, service_error = _resolve_service(service_rows, args, state)
+    if matched is None:
+        return (
+            {
+                "success": False,
+                "error": {
+                    "error_code": "SERVICE_NOT_FOUND",
+                    "message": service_error or "Service is required",
+                    "available_services": _service_catalog_names(service_rows),
+                },
+            },
+            service_error or "Which service should I book?",
+        )
+    service_id = uuid_from_string(matched["service_id"])
+    service_name = str(matched.get("name") or "").strip() or None
     state.selected_service_id = service_id
     state.selected_service_name = service_name
 

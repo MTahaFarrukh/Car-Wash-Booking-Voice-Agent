@@ -170,12 +170,14 @@ class VoiceConversationService:
         state = call_session_store.get(payload.call_id)
         outcome_key = payload.outcome or state.outcome_hint or "no_booking"
         if outcome_key == "booking_created" and not (state.last_booking_id or state.target_booking_id):
-            outcome_key = "no_booking"
+            # Session may have lost in-memory ids after worker recycle; CallLog may already be linked.
+            outcome_key = "booking_created" if self._call_log_has_booking(payload.call_id) else "no_booking"
         outcome = OUTCOME_MAP.get(outcome_key, CallOutcome.NO_BOOKING)
 
         log = self.db.scalar(select(CallLog).where(CallLog.call_id == payload.call_id))
         ended_at = datetime.now(timezone.utc)
         duration = payload.duration_seconds
+        booking_id = state.last_booking_id or state.target_booking_id
         if log is not None:
             if duration is None and log.started_at is not None:
                 started = log.started_at
@@ -188,9 +190,12 @@ class VoiceConversationService:
             log.phone = state.phone or log.phone
             if state.provider:
                 log.provider = state.provider
-            booking_id = state.last_booking_id or state.target_booking_id
             if booking_id is not None:
                 log.booking_id = booking_id
+            elif log.booking_id is not None and outcome == CallOutcome.NO_BOOKING:
+                # Keep linked booking; upgrade outcome if we already saved during the call.
+                log.outcome = CallOutcome.BOOKING_CREATED
+                outcome = CallOutcome.BOOKING_CREATED
             self.db.commit()
         else:
             log = CallLog(
@@ -200,7 +205,7 @@ class VoiceConversationService:
                 phone=state.phone,
                 duration_seconds=duration,
                 outcome=outcome,
-                booking_id=state.last_booking_id or state.target_booking_id,
+                booking_id=booking_id,
             )
             self.db.add(log)
             self.db.commit()
@@ -308,6 +313,8 @@ class VoiceConversationService:
                 state = call_session_store.get(event.call_id, provider=event.provider)
                 if event.caller_phone and not state.phone:
                     self._ensure_customer(state, event.caller_phone, event.caller_name)
+                # CallLog must exist before tool completion so booking_id can be linked immediately.
+                self._upsert_call_log_start(state)
                 for call in event.tool_calls:
                     logger.info(
                         "voice_provider_tool call_id=%s provider=%s name=%s",
@@ -331,6 +338,8 @@ class VoiceConversationService:
                             "presentation": executed.presentation_instructions,
                         }
                     )
+                # Re-link after the batch in case session state was updated by save_booking.
+                self._touch_call_log(state)
                 summary["handled"].append({"type": "tool.execute", "count": len(event.tool_calls)})
                 continue
 
@@ -394,6 +403,10 @@ class VoiceConversationService:
         self.db.add(log)
         self.db.commit()
 
+    def _call_log_has_booking(self, call_id: str) -> bool:
+        log = self.db.scalar(select(CallLog).where(CallLog.call_id == call_id))
+        return log is not None and log.booking_id is not None
+
     def _touch_call_log(self, state: CallSessionState) -> None:
         log = self.db.scalar(select(CallLog).where(CallLog.call_id == state.call_id))
         if log is None:
@@ -413,3 +426,10 @@ class VoiceConversationService:
         elif state.outcome_hint == "cancelled":
             log.outcome = CallOutcome.CANCELLED
         self.db.commit()
+        if booking_id is not None:
+            logger.info(
+                "voice_call_log_linked call_id=%s booking_id=%s outcome=%s",
+                state.call_id,
+                booking_id,
+                log.outcome.value if log.outcome else None,
+            )
