@@ -122,6 +122,57 @@ class TestVapiProvider:
         )
         assert formatted["results"][0]["toolCallId"] == "tc1"
         assert isinstance(formatted["results"][0]["result"], str)
+        assert "error" not in formatted["results"][0]
+
+    def test_openai_style_tool_call_nested_function(self):
+        provider = VapiVoiceProvider(_settings())
+        payload = {
+            "message": {
+                "type": "tool-calls",
+                "call": {"id": "call-tools-2"},
+                "toolCallList": [
+                    {
+                        "id": "call_vtVHQXttgp960ek68rQ7sthQ",
+                        "type": "function",
+                        "function": {
+                            "name": "Save Booking",
+                            "arguments": json.dumps(
+                                {
+                                    "name": "Taha",
+                                    "phone": "1234567891",
+                                    "vehicle": "Suzuki Swift",
+                                    "date": "2026-08-23",
+                                    "time": "17:00",
+                                }
+                            ),
+                        },
+                    }
+                ],
+            }
+        }
+        calls = provider.normalize_tool_calls(payload)
+        assert len(calls) == 1
+        assert calls[0].id == "call_vtVHQXttgp960ek68rQ7sthQ"
+        assert calls[0].name == "Save Booking"
+        assert calls[0].arguments["vehicle"] == "Suzuki Swift"
+        formatted = provider.format_tool_results(
+            [
+                {
+                    "id": calls[0].id,
+                    "name": calls[0].name,
+                    "result": {"success": False, "error": {"message": "slot taken"}},
+                    "presentation": "That slot is taken.",
+                }
+            ]
+        )
+        assert formatted == {
+            "results": [
+                {
+                    "toolCallId": "call_vtVHQXttgp960ek68rQ7sthQ",
+                    "result": "That slot is taken.",
+                }
+            ]
+        }
 
     def test_user_interrupted_event(self):
         provider = VapiVoiceProvider(_settings())

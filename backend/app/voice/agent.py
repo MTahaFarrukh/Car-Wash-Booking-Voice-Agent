@@ -145,14 +145,20 @@ class VoiceConversationAgent:
         """Direct Phase 5 tool execution for provider-proxied tool RPC."""
         from app.llm.schemas import LLMToolCall
 
-        call = LLMToolCall(id=str(uuid.uuid4()), name=name, arguments=arguments or {})
+        from app.voice.tool_aliases import execute_save_booking, normalize_tool_name
+
+        resolved = normalize_tool_name(name)
+        if resolved == "save_booking":
+            return execute_save_booking(self.agent, state, arguments or {})
+
+        call = LLMToolCall(id=str(uuid.uuid4()), name=resolved, arguments=arguments or {})
         raw = self._run_tool(call, state)
         payload = json.loads(raw)
         spoken = None
-        if payload.get("success") and name == "create_booking":
+        if payload.get("success") and resolved == "create_booking":
             spoken = "Your booking is confirmed."
             state.outcome_hint = "booking_created"
-        elif payload.get("success") and name == "cancel_booking":
+        elif payload.get("success") and resolved == "cancel_booking":
             spoken = "Your booking has been cancelled."
             state.outcome_hint = "cancelled"
         elif not payload.get("success"):

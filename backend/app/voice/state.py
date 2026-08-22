@@ -38,9 +38,14 @@ class CallSessionStore:
     def __init__(self) -> None:
         self._states: dict[str, CallSessionState] = {}
 
-    def get(self, call_id: str, *, provider: str = "fake") -> CallSessionState:
+    def get(self, call_id: str, *, provider: str | None = None) -> CallSessionState:
         if call_id not in self._states:
-            self._states[call_id] = CallSessionState(call_id=call_id, provider=provider)
+            self._states[call_id] = CallSessionState(
+                call_id=call_id,
+                provider=(provider or "vapi"),
+            )
+        elif provider:
+            self._states[call_id].provider = provider
         return self._states[call_id]
 
     def reset(self, call_id: str) -> None:

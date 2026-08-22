@@ -16,6 +16,7 @@ from app.routers import (
     voice_router,
     whatsapp_router,
 )
+from app.routers.voice import vapi_alias_router
 
 # Import models so SQLAlchemy registers metadata (used by Alembic in Phase 2)
 import app.models  # noqa: F401
@@ -43,6 +44,7 @@ app.include_router(availability_router)
 app.include_router(bookings_router)
 app.include_router(whatsapp_router)
 app.include_router(voice_router)
+app.include_router(vapi_alias_router)
 
 
 @app.get("/health")

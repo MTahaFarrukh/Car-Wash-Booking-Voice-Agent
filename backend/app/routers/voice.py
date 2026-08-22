@@ -28,6 +28,8 @@ from app.voice.service import VoiceConversationService
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/voice", tags=["voice"])
+# Catch common VAPI misconfigurations (tool Server URL truncated).
+vapi_alias_router = APIRouter(tags=["voice"])
 
 
 def verify_voice_secret(x_voice_webhook_secret: str = Header(...)) -> None:
@@ -40,6 +42,93 @@ def verify_voice_secret(x_voice_webhook_secret: str = Header(...)) -> None:
         )
     if not hmac.compare_digest(x_voice_webhook_secret, expected):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid voice webhook secret")
+
+
+async def _handle_vapi_request(request: Request, db: Session) -> dict:
+    """Shared VAPI webhook handler used by canonical + alias paths."""
+    body = await request.body()
+    headers = {k: v for k, v in request.headers.items()}
+    provider = VapiVoiceProvider(get_settings())
+    if not provider.verify_webhook(headers=headers, body=body):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid VAPI webhook auth")
+
+    try:
+        payload = json.loads(body.decode("utf-8") or "{}")
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON") from exc
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid webhook payload")
+
+    message = payload.get("message") if isinstance(payload.get("message"), dict) else {}
+    msg_type = str(message.get("type") or "")
+    logger.info("vapi_webhook path=%s type=%s", request.url.path, msg_type or "unknown")
+
+    if msg_type == "assistant-request":
+        return provider.assistant_request_response()
+
+    if msg_type == "tool-calls":
+        preview_calls = provider.normalize_tool_calls(payload)
+        logger.info(
+            "vapi_tool_calls names=%s ids=%s",
+            [c.name for c in preview_calls],
+            [c.id for c in preview_calls],
+        )
+
+    events = provider.parse_webhook(payload)
+    if not events:
+        # Never 400 on tool-calls — VAPI treats non-results bodies as "No result returned".
+        if msg_type == "tool-calls":
+            fallback_ids = provider.extract_tool_call_ids(payload) or ["unknown"]
+            logger.warning("vapi_tool_calls unrecognized payload; returning fallback results ids=%s", fallback_ids)
+            return provider.format_tool_results(
+                [
+                    {
+                        "id": cid,
+                        "name": "unknown",
+                        "result": {"success": False, "error": {"message": "Unrecognized tool payload"}},
+                        "presentation": "Sorry, I could not process that booking request.",
+                    }
+                    for cid in fallback_ids
+                ]
+            )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unrecognized VAPI event")
+
+    service = VoiceConversationService(db, voice_provider=provider)
+    summary = service.handle_normalized_events(events)
+
+    if any(e.event_type == "tool.execute" for e in events):
+        tool_results = summary.get("tool_results") or []
+        if not tool_results:
+            fallback_ids = provider.extract_tool_call_ids(payload)
+            logger.warning(
+                "vapi_tool_calls empty results after handle; fallback ids=%s",
+                fallback_ids,
+            )
+            tool_results = [
+                {
+                    "id": cid,
+                    "name": "unknown",
+                    "result": {"success": False, "error": {"message": "No tool calls parsed"}},
+                    "presentation": "Sorry, I could not save the booking just now.",
+                }
+                for cid in fallback_ids
+            ] or [
+                {
+                    "id": "unknown",
+                    "name": "unknown",
+                    "result": {"success": False, "error": {"message": "No tool calls parsed"}},
+                    "presentation": "Sorry, I could not save the booking just now.",
+                }
+            ]
+        response = provider.format_tool_results(tool_results)
+        logger.info(
+            "vapi_tool_results ids=%s",
+            [r.get("toolCallId") for r in response.get("results") or []],
+        )
+        return response
+
+    return {"ok": True, "handled": summary.get("handled", [])}
 
 
 @router.post("/calls/start", response_model=VoiceCallStartResponse)
@@ -104,42 +193,23 @@ def voice_events(
 
 @router.post("/vapi/webhook")
 async def vapi_webhook(request: Request, db: Session = Depends(get_db)) -> dict:
+    """Canonical VAPI Server URL webhook."""
+    return await _handle_vapi_request(request, db)
+
+
+@router.api_route("", methods=["POST"])
+@router.api_route("/", methods=["POST"])
+async def vapi_webhook_root_alias(request: Request, db: Session = Depends(get_db)) -> dict:
     """
-    VAPI Server URL webhook.
-
-    Parses VAPI-native payloads inside VapiVoiceProvider, then routes through
-    the shared VoiceConversationService + Phase 5 tools.
+    Alias for tools whose Server URL was set to .../api/voice (missing /vapi/webhook).
     """
-    body = await request.body()
-    headers = {k: v for k, v in request.headers.items()}
-    provider = VapiVoiceProvider(get_settings())
-    if not provider.verify_webhook(headers=headers, body=body):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid VAPI webhook auth")
+    return await _handle_vapi_request(request, db)
 
-    try:
-        payload = json.loads(body.decode("utf-8") or "{}")
-    except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON") from exc
 
-    if not isinstance(payload, dict):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid webhook payload")
-
-    message = payload.get("message") if isinstance(payload.get("message"), dict) else {}
-    if str(message.get("type") or "") == "assistant-request":
-        return provider.assistant_request_response()
-
-    events = provider.parse_webhook(payload)
-    if not events:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unrecognized VAPI event")
-
-    service = VoiceConversationService(db, voice_provider=provider)
-    summary = service.handle_normalized_events(events)
-
-    # tool-calls require a VAPI-shaped response
-    if any(e.event_type == "tool.execute" for e in events):
-        return provider.format_tool_results(summary.get("tool_results") or [])
-
-    return {"ok": True, "handled": summary.get("handled", [])}
+@vapi_alias_router.post("/vapi/webhook")
+async def vapi_webhook_legacy_alias(request: Request, db: Session = Depends(get_db)) -> dict:
+    """Alias for .../vapi/webhook without the /api/voice prefix."""
+    return await _handle_vapi_request(request, db)
 
 
 @router.post("/uplift/webhook")

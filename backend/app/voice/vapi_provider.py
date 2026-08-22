@@ -271,61 +271,123 @@ class VapiVoiceProvider(VoiceProvider):
     def normalize_tool_calls(self, payload: dict[str, Any]) -> list[NormalizedVoiceToolCall]:
         message = payload.get("message") if isinstance(payload.get("message"), dict) else payload
         calls: list[NormalizedVoiceToolCall] = []
+        seen: set[str] = set()
 
-        tool_call_list = message.get("toolCallList")
-        if isinstance(tool_call_list, list):
-            for item in tool_call_list:
-                if not isinstance(item, dict):
-                    continue
-                call_id = str(item.get("id") or "")
-                name = str(item.get("name") or "")
-                params = item.get("parameters") or item.get("arguments") or {}
-                if isinstance(params, str):
-                    try:
-                        params = json.loads(params)
-                    except json.JSONDecodeError:
-                        params = {}
-                if not isinstance(params, dict):
+        def _append(call_id: Any, name: Any, params: Any) -> None:
+            cid = str(call_id or "").strip()
+            n = str(name or "").strip()
+            if isinstance(params, str):
+                try:
+                    params = json.loads(params)
+                except json.JSONDecodeError:
                     params = {}
-                if call_id and name:
-                    calls.append(NormalizedVoiceToolCall(id=call_id, name=name, arguments=params))
-            if calls:
-                return calls
+            if not isinstance(params, dict):
+                params = {}
+            if not cid or not n or cid in seen:
+                return
+            seen.add(cid)
+            calls.append(NormalizedVoiceToolCall(id=cid, name=n, arguments=params))
 
-        # Alternate shape: toolWithToolCallList
+        def _from_item(item: dict[str, Any], *, fallback_name: Any = None) -> None:
+            function = item.get("function") if isinstance(item.get("function"), dict) else {}
+            _append(
+                item.get("id"),
+                item.get("name") or function.get("name") or fallback_name,
+                item.get("parameters")
+                or item.get("arguments")
+                or function.get("arguments")
+                or function.get("parameters"),
+            )
+
+        for key in ("toolCallList", "toolCalls", "tool_calls"):
+            items = message.get(key)
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                if isinstance(item, dict):
+                    _from_item(item)
+
         bundled = message.get("toolWithToolCallList")
         if isinstance(bundled, list):
             for item in bundled:
                 if not isinstance(item, dict):
                     continue
                 tool_call = item.get("toolCall") if isinstance(item.get("toolCall"), dict) else {}
-                call_id = str(tool_call.get("id") or "")
-                name = str(item.get("name") or tool_call.get("name") or "")
-                params = tool_call.get("parameters") or tool_call.get("arguments") or {}
-                if isinstance(params, str):
-                    try:
-                        params = json.loads(params)
-                    except json.JSONDecodeError:
-                        params = {}
-                if not isinstance(params, dict):
-                    params = {}
-                if call_id and name:
-                    calls.append(NormalizedVoiceToolCall(id=call_id, name=name, arguments=params))
+                function = tool_call.get("function") if isinstance(tool_call.get("function"), dict) else {}
+                _append(
+                    tool_call.get("id") or item.get("id"),
+                    item.get("name") or tool_call.get("name") or function.get("name"),
+                    tool_call.get("parameters")
+                    or tool_call.get("arguments")
+                    or function.get("arguments")
+                    or function.get("parameters")
+                    or item.get("parameters"),
+                )
+
+        # Top-level OpenAI-style (some custom tool posts)
+        top_calls = payload.get("toolCalls") if isinstance(payload.get("toolCalls"), list) else []
+        for item in top_calls:
+            if isinstance(item, dict):
+                _from_item(item)
+
         return calls
 
+    def extract_tool_call_ids(self, payload: dict[str, Any]) -> list[str]:
+        """Best-effort ids for fallback responses when parsing fails."""
+        ids: list[str] = []
+        seen: set[str] = set()
+
+        def _add(value: Any) -> None:
+            cid = str(value or "").strip()
+            if cid and cid not in seen:
+                seen.add(cid)
+                ids.append(cid)
+
+        message = payload.get("message") if isinstance(payload.get("message"), dict) else payload
+        for key in ("toolCallList", "toolCalls", "tool_calls"):
+            items = message.get(key)
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                if isinstance(item, dict):
+                    _add(item.get("id"))
+        bundled = message.get("toolWithToolCallList")
+        if isinstance(bundled, list):
+            for item in bundled:
+                if not isinstance(item, dict):
+                    continue
+                tool_call = item.get("toolCall") if isinstance(item.get("toolCall"), dict) else {}
+                _add(tool_call.get("id") or item.get("id"))
+        return ids
+
     def format_tool_results(self, results: list[dict[str, Any]]) -> dict[str, Any]:
+        """
+        VAPI requires a `result` string for every toolCallId:
+        { "results": [ { "toolCallId": "<exact id>", "result": "<single-line string>" } ] }
+
+        Using only an `error` key (without `result`) triggers "No result returned".
+        """
         formatted = []
         for item in results:
+            tool_call_id = str(item.get("id") or item.get("toolCallId") or "").strip()
+            presentation = item.get("presentation")
             result_payload = item.get("result")
-            if not isinstance(result_payload, str):
-                result_payload = json.dumps(result_payload)
-            formatted.append(
-                {
-                    "name": item.get("name"),
-                    "toolCallId": item.get("id"),
-                    "result": result_payload,
-                }
-            )
+            success = True
+            if isinstance(result_payload, dict):
+                success = bool(result_payload.get("success", True))
+            if presentation:
+                text = str(presentation).replace("\n", " ").strip()
+            elif isinstance(result_payload, dict):
+                if success:
+                    text = "Booking saved successfully."
+                else:
+                    err = result_payload.get("error") or {}
+                    text = str(err.get("message") or "Tool failed").replace("\n", " ").strip()
+            else:
+                text = str(result_payload or "").replace("\n", " ").strip() or "OK"
+            if not text:
+                text = "OK"
+            formatted.append({"toolCallId": tool_call_id, "result": text})
         return {"results": formatted}
 
     def assistant_request_response(self) -> dict[str, Any]:

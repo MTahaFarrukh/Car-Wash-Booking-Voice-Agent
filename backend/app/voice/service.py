@@ -304,13 +304,23 @@ class VoiceConversationService:
                 continue
 
             if event.event_type == "tool.execute":
+                # Ensure session is tagged with the real provider before tools run.
+                state = call_session_store.get(event.call_id, provider=event.provider)
+                if event.caller_phone and not state.phone:
+                    self._ensure_customer(state, event.caller_phone, event.caller_name)
                 for call in event.tool_calls:
+                    logger.info(
+                        "voice_provider_tool call_id=%s provider=%s name=%s",
+                        event.call_id,
+                        event.provider,
+                        call.name,
+                    )
                     executed = self.execute_tool(
                         VoiceToolExecuteRequest(
                             call_id=event.call_id,
                             name=call.name,
                             arguments=call.arguments,
-                            caller_phone=event.caller_phone,
+                            caller_phone=event.caller_phone or state.phone,
                         )
                     )
                     summary["tool_results"].append(
