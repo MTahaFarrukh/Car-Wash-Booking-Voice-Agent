@@ -136,7 +136,7 @@ class AvailabilityService:
             return AvailabilityCheckResult(
                 available=len(available_slots) > 0,
                 requested_time=None,
-                alternatives=available_slots[:5],
+                alternatives=available_slots,
                 message=None if available_slots else "No available slots for this date",
             )
 

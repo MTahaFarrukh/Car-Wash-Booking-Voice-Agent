@@ -1,5 +1,6 @@
 """API router package."""
 
+from app.routers.admin import router as admin_router
 from app.routers.availability import router as availability_router
 from app.routers.bookings import router as bookings_router
 from app.routers.customers import router as customers_router
@@ -9,6 +10,7 @@ from app.routers.voice import router as voice_router
 from app.routers.whatsapp import router as whatsapp_router
 
 __all__ = [
+    "admin_router",
     "availability_router",
     "bookings_router",
     "customers_router",
@@ -17,4 +19,3 @@ __all__ = [
     "voice_router",
     "whatsapp_router",
 ]
-

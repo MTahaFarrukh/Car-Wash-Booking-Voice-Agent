@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.database import engine
 from app.routers import (
+    admin_router,
     availability_router,
     bookings_router,
     customers_router,
@@ -45,6 +46,7 @@ app.include_router(bookings_router)
 app.include_router(whatsapp_router)
 app.include_router(voice_router)
 app.include_router(vapi_alias_router)
+app.include_router(admin_router)
 
 
 @app.get("/health")

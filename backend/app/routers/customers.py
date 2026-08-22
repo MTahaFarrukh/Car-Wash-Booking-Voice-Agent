@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -27,6 +27,22 @@ def create_customer(payload: CustomerCreate, db: Session = Depends(get_db)) -> C
     db.commit()
     db.refresh(customer)
     return customer
+
+
+@router.get("", response_model=list[CustomerResponse])
+def list_customers(
+    q: str | None = Query(default=None),
+    phone: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+) -> list[Customer]:
+    stmt = select(Customer).order_by(Customer.created_at.desc()).limit(limit)
+    if phone:
+        stmt = stmt.where(Customer.phone == phone.strip())
+    elif q:
+        pattern = f"%{q.strip()}%"
+        stmt = stmt.where((Customer.name.ilike(pattern)) | (Customer.phone.ilike(pattern)))
+    return list(db.scalars(stmt).all())
 
 
 @router.get("/{customer_id}", response_model=CustomerResponse)

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
 from app.models.customer import Customer
@@ -14,6 +14,20 @@ from app.models.vehicle import Vehicle
 from app.schemas.vehicle import VehicleCreate, VehicleResponse, VehicleUpdate
 
 router = APIRouter(tags=["vehicles"])
+
+
+@router.get("/api/vehicles", response_model=list[VehicleResponse])
+def list_vehicles(
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+) -> list[Vehicle]:
+    stmt = (
+        select(Vehicle)
+        .options(joinedload(Vehicle.customer))
+        .order_by(Vehicle.created_at.desc())
+        .limit(limit)
+    )
+    return list(db.scalars(stmt).unique().all())
 
 
 @router.post(

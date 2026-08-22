@@ -11,12 +11,13 @@ Monorepo for **Sparkle Car Wash**: book, reschedule, and cancel washes through a
 | Area | Status |
 |------|--------|
 | Booking domain (services, availability, create / reschedule / cancel) | Done |
-| REST API + Next.js frontend | Done |
+| REST API + Next.js web app (public + admin) | Done — Phase 9 |
 | WhatsApp bridge (Baileys) + Gemini tool-calling agent | Done |
 | Voice channel (Phase 8) + VAPI / Uplift adapters (8.1) | Done — live VAPI booking verified |
+| Browser VAPI voice booking (`/voice`) | Done — uses `@vapi-ai/web` + public key |
 | Shared Phase 5 tool layer (no second booking engine) | Done |
 
-Voice and WhatsApp both call the same agent tools. VAPI’s **Save Booking** tool maps into that layer via aliases on the backend.
+Voice, WhatsApp, and website bookings all use the same booking engine. Manual web bookings use `BookingSource.dashboard`; voice uses `voice`; WhatsApp uses `whatsapp`.
 
 ---
 
@@ -85,16 +86,14 @@ python -m scripts.seed
 Use [`run.txt`](run.txt) — typically:
 
 1. **Backend** — `uvicorn` on port `8000`  
-2. **Frontend** — `npm run dev` (optional)  
+2. **Frontend** — `npm run dev` in `frontend/` (copy `frontend/.env.local.example` → `.env.local`)  
 3. **WhatsApp bridge** — `npm start` in `whatsapp-bridge/` (optional)  
-4. **ngrok** — `ngrok http 8000` for VAPI (optional)
+4. **ngrok** — `ngrok http 8000` for VAPI tool webhooks (optional)
 
-Checks:
+Public site: `http://localhost:3000` — Book Online · Talk to AI · WhatsApp  
+Admin: `http://localhost:3000/admin`
 
-- Health: `http://127.0.0.1:8000/health`  
-- API docs: `http://127.0.0.1:8000/docs`  
-- Voice provider: `http://127.0.0.1:8000/api/voice/provider`  
-- Frontend: `http://localhost:3000`
+For browser voice: set `NEXT_PUBLIC_VAPI_PUBLIC_KEY` (VAPI **public** key) and `NEXT_PUBLIC_VAPI_ASSISTANT_ID` in `frontend/.env.local`. Never put `VAPI_API_KEY` or webhook secrets in `NEXT_PUBLIC_*`.
 
 ### 4. Tests
 
