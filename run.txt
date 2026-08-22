@@ -1,9 +1,11 @@
 # ============================================================
 # Sparkle Car Wash — how to start everything (Windows PowerShell)
 # Repo root: carwash-booking/
+# Phase 9: public site + admin + three booking channels
 # ============================================================
 # Open ONE terminal per section below. Keep them all running.
-# Root .env holds secrets (never commit it). Copy from .env.example first time.
+# Root .env = server secrets (never commit).
+# frontend/.env.local = browser-safe NEXT_PUBLIC_* only.
 # ============================================================
 
 
@@ -17,10 +19,11 @@
 # python -m scripts.seed
 #
 # cd ..\frontend
+# copy .env.local.example .env.local
 # npm install
 #
 # cd ..\whatsapp-bridge
-# copy .env.example .env           # set WHATSAPP_BRIDGE_SECRET to match root .env
+# copy .env.example .env           # WHATSAPP_BRIDGE_SECRET must match root .env
 # npm install
 #
 # ngrok: install to C:\ngrok\ngrok.exe and run once:
@@ -33,23 +36,40 @@
 cd backend
 .\venv\Scripts\activate
 alembic upgrade head
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
-# Health check: http://127.0.0.1:8000/health
+# Health:        http://127.0.0.1:8000/health
 # Voice status:  http://127.0.0.1:8000/api/voice/provider
-# If port 8000 is stuck, use --port 8001 and point ngrok at 8001 instead.
+# Admin status:  http://127.0.0.1:8000/api/admin/status
+# API docs:      http://127.0.0.1:8000/docs
+#
+# If port 8000 is stuck (Windows ghost listener):
+#   uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
+# Then set frontend/.env.local:
+#   NEXT_PUBLIC_API_URL=http://localhost:8001
+# And point ngrok at 8001:  C:\ngrok\ngrok.exe http 8001
 
 
 # ------------------------------------------------------------
-# Terminal 2 — Frontend (Next.js)  OPTIONAL for dashboard/UI
+# Terminal 2 — Frontend (Next.js)  REQUIRED for Phase 9 web app
 # ------------------------------------------------------------
 cd frontend
+# First time / after pull: copy .env.local.example .env.local
+# Edit frontend/.env.local:
+#   NEXT_PUBLIC_API_URL=http://localhost:8000
+#   NEXT_PUBLIC_WHATSAPP_NUMBER=92300...     # digits only, for wa.me
+#   NEXT_PUBLIC_VAPI_PUBLIC_KEY=...         # VAPI Dashboard PUBLIC key only
+#   NEXT_PUBLIC_VAPI_ASSISTANT_ID=...       # same assistant as root .env
+# Never put VAPI_API_KEY / VAPI_WEBHOOK_SECRET / WHATSAPP_BRIDGE_SECRET here.
 npm run dev
-# Open http://localhost:3000
+# Site:   http://localhost:3000
+# Book:   http://localhost:3000/book
+# Voice:  http://localhost:3000/voice
+# Admin:  http://localhost:3000/admin
 
 
 # ------------------------------------------------------------
-# Terminal 3 — WhatsApp bridge (Baileys)  OPTIONAL for WhatsApp
+# Terminal 3 — WhatsApp bridge (Baileys)  OPTIONAL
 # ------------------------------------------------------------
 cd whatsapp-bridge
 npm start
@@ -58,31 +78,47 @@ npm start
 
 
 # ------------------------------------------------------------
-# Terminal 4 — ngrok (public URL for VAPI webhooks)  OPTIONAL for voice
+# Terminal 4 — ngrok (VAPI tool webhooks)  OPTIONAL for live voice
 # ------------------------------------------------------------
 C:\ngrok\ngrok.exe http 8000
-# Copy the https://….ngrok-free.app URL from the ngrok UI / terminal.
-# Free URLs change when you restart ngrok — update VAPI each time.
+# (Use http 8001 if backend is on 8001.)
+# Copy the https://….ngrok-free.dev URL.
+# Free URLs often change on restart — update VAPI Server URL each time.
 
 
 # ------------------------------------------------------------
-# VAPI voice wiring (after Terminals 1 + 4 are up)
+# VAPI wiring (phone tools + browser voice)
 # ------------------------------------------------------------
-# In root .env:
+# Root .env (server — webhook / outbound API):
 #   VOICE_PROVIDER=vapi
 #   VAPI_API_KEY=...
 #   VAPI_ASSISTANT_ID=...
 #   VAPI_WEBHOOK_SECRET=...
-# Restart Terminal 1 after changing .env
+# Restart Terminal 1 after changing root .env.
 #
-# In VAPI Dashboard → Assistant → Server URL:
+# VAPI Dashboard → Assistant / Save Booking tool → Server URL:
 #   https://<ngrok-host>/api/voice/vapi/webhook
-# Auth: Bearer token = same value as VAPI_WEBHOOK_SECRET
-# (Do NOT use VAPI_API_KEY for webhook auth.)
+# Auth: Bearer = VAPI_WEBHOOK_SECRET  (NOT VAPI_API_KEY)
+#
+# Browser /voice page (frontend/.env.local):
+#   NEXT_PUBLIC_VAPI_PUBLIC_KEY=<Public key from VAPI dashboard>
+#   NEXT_PUBLIC_VAPI_ASSISTANT_ID=<same assistant id>
+# Restart Terminal 2 after changing .env.local.
 #
 # Self-check:
-#   GET  http://127.0.0.1:8000/api/voice/provider
-#   Should show active_provider=vapi, configured=true
+#   GET http://127.0.0.1:8000/api/voice/provider
+#   → active_provider=vapi, configured=true
+
+
+# ------------------------------------------------------------
+# Quick Phase 9 test checklist (tomorrow)
+# ------------------------------------------------------------
+# 1) Terminals 1 + 2 up → open http://localhost:3000
+# 2) Book Online → complete wizard → booking appears in /admin/bookings (source WEB)
+# 3) Talk to AI → needs public key in .env.local → booking source VOICE
+# 4) Book on WhatsApp → wa.me link (bridge optional for real replies)
+# 5) /admin shows bookings, calls, WhatsApp activity, settings status
+# 6) Optional: Terminals 1 + 4 + VAPI Server URL for phone/tool webhooks
 
 
 # ------------------------------------------------------------
@@ -91,16 +127,22 @@ C:\ngrok\ngrok.exe http 8000
 # UPLIFT_API_KEY=...
 # UPLIFT_AGENT_ID=...
 # VOICE_WEBHOOK_SECRET=...
-# Tool handlers proxy to: POST /api/voice/uplift/webhook
 # See backend/app/voice/README.md
 
 
 # ------------------------------------------------------------
-# Useful .env keys (root .env)
+# Useful env keys
 # ------------------------------------------------------------
-# DATABASE_URL, SUPABASE_*
-# WHATSAPP_BRIDGE_SECRET, WHATSAPP_AGENT_MODE
-# LLM_PROVIDER=gemini, GEMINI_API_KEY, GEMINI_MODEL=gemini-3.6-flash
-# VOICE_PROVIDER=vapi|uplift|fake|auto
-# VAPI_API_KEY, VAPI_ASSISTANT_ID, VAPI_WEBHOOK_SECRET
-# UPLIFT_API_KEY, UPLIFT_AGENT_ID, VOICE_WEBHOOK_SECRET
+# Root .env:
+#   DATABASE_URL, SUPABASE_*
+#   WHATSAPP_BRIDGE_SECRET, WHATSAPP_AGENT_MODE
+#   LLM_PROVIDER=gemini, GEMINI_API_KEY, GEMINI_MODEL
+#   VOICE_PROVIDER=vapi|uplift|fake|auto
+#   VAPI_API_KEY, VAPI_ASSISTANT_ID, VAPI_WEBHOOK_SECRET
+#   UPLIFT_API_KEY, UPLIFT_AGENT_ID, VOICE_WEBHOOK_SECRET
+#
+# frontend/.env.local:
+#   NEXT_PUBLIC_API_URL
+#   NEXT_PUBLIC_WHATSAPP_NUMBER
+#   NEXT_PUBLIC_VAPI_PUBLIC_KEY
+#   NEXT_PUBLIC_VAPI_ASSISTANT_ID
