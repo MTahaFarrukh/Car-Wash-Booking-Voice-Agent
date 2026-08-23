@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from datetime import date, datetime, time
@@ -19,6 +20,8 @@ from app.schemas.agent import (
 )
 from app.voice.state import CallSessionState
 from app.whatsapp.parser import uuid_from_string
+
+logger = logging.getLogger(__name__)
 
 # VAPI / loose assistant tool names → Phase 5 (or composite voice helpers).
 TOOL_ALIASES: dict[str, str] = {
@@ -183,7 +186,8 @@ def _resolve_service(
     """
     Resolve service from tool args or prior session selection.
 
-    Returns (row, error_spoken). Never assumes Premium Wash.
+    When the caller/tool omits a service (common for VAPI Save Booking),
+    use the first active catalog row — never a hardcoded Premium Wash name.
     """
     hint = str(
         _pick(args, "service", "service_name", "wash_type", "service_type", "package") or ""
@@ -198,11 +202,10 @@ def _resolve_service(
         hint = state.selected_service_name
 
     if not hint:
-        names = _service_catalog_names(service_rows)
-        spoken = "Which service should I book?"
-        if names:
-            spoken = f"Which service should I book: {', '.join(names)}?"
-        return None, spoken
+        if not service_rows:
+            return None, "I couldn't load our wash services right now."
+        # Voice tools often omit service; pick first live catalog entry dynamically.
+        return service_rows[0], None
 
     matched = _match_service_row(service_rows, hint)
     if matched is None:
@@ -297,6 +300,7 @@ def execute_save_booking(
     service_rows = services.data["services"]
     matched, service_error = _resolve_service(service_rows, args, state)
     if matched is None:
+        logger.warning("save_booking service resolve failed: %s", service_error)
         return (
             {
                 "success": False,
@@ -312,6 +316,12 @@ def execute_save_booking(
     service_name = str(matched.get("name") or "").strip() or None
     state.selected_service_id = service_id
     state.selected_service_name = service_name
+    logger.info(
+        "save_booking resolved service=%s date=%s time=%s",
+        service_name,
+        booking_date,
+        booking_time,
+    )
 
     availability = agent.check_availability(
         AvailabilityToolInput(

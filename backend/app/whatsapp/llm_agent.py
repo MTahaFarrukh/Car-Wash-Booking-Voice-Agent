@@ -54,6 +54,7 @@ class LLMConversationAgent:
         started = time_module.perf_counter()
         tool_calls_used = 0
         max_calls = max(1, self.settings.llm_max_tool_calls)
+        booking_id_before = state.target_booking_id
 
         try:
             for _ in range(max_calls):
@@ -81,7 +82,7 @@ class LLMConversationAgent:
                                 state.sender_id,
                                 tool_calls_used,
                             )
-                            reply = FALLBACK_REPLY
+                            reply = self._recovery_reply(state, booking_id_before) or FALLBACK_REPLY
                             self._remember(state, text, reply)
                             return reply
                         tool_payload = self._run_tool(call, state)
@@ -95,7 +96,9 @@ class LLMConversationAgent:
                         )
                     continue
 
-                reply = (completion.content or "").strip() or FALLBACK_REPLY
+                reply = (completion.content or "").strip() or (
+                    self._recovery_reply(state, booking_id_before) or FALLBACK_REPLY
+                )
                 reply = self._sanitize_customer_reply(reply)
                 elapsed_ms = int((time_module.perf_counter() - started) * 1000)
                 logger.info(
@@ -108,19 +111,36 @@ class LLMConversationAgent:
                 return reply
 
             logger.warning("tool_loop_exhausted sender=%s", state.sender_id)
-            reply = FALLBACK_REPLY
+            reply = self._recovery_reply(state, booking_id_before) or FALLBACK_REPLY
             self._remember(state, text, reply)
             return reply
         except LLMProviderError:
             logger.exception("llm_provider_failed sender=%s", state.sender_id)
-            reply = FALLBACK_REPLY
+            reply = self._recovery_reply(state, booking_id_before) or FALLBACK_REPLY
             self._remember(state, text, reply)
             return reply
         except Exception:
             logger.exception("llm_agent_failed sender=%s", state.sender_id)
-            reply = FALLBACK_REPLY
+            reply = self._recovery_reply(state, booking_id_before) or FALLBACK_REPLY
             self._remember(state, text, reply)
             return reply
+
+    def _recovery_reply(
+        self,
+        state: ConversationState,
+        booking_id_before: uuid.UUID | None,
+    ) -> str | None:
+        """If tools already booked, confirm instead of a generic Gemini failure."""
+        if state.target_booking_id is None or state.target_booking_id == booking_id_before:
+            return None
+        service = state.selected_service_name or "wash"
+        when_date = state.requested_date.isoformat() if state.requested_date else "the selected date"
+        when_time = state.requested_time.strftime("%H:%M") if state.requested_time else "the selected time"
+        vehicle = state.selected_vehicle_label or "your vehicle"
+        return (
+            f"You're booked for a {service} for {vehicle} on {when_date} at {when_time}. "
+            "See you at Sparkle Car Wash!"
+        )
 
     def _run_tool(self, call: LLMToolCall, state: ConversationState) -> str:
         logger.info("tool_call sender=%s name=%s", state.sender_id, call.name)

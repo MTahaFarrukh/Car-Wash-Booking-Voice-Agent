@@ -421,7 +421,9 @@ class TestVapiSaveBookingPolish:
         assert log.outcome == CallOutcome.BOOKING_CREATED
         assert log.provider == "vapi"
 
-    def test_save_booking_without_service_asks_for_catalog_choice(self, db_session):
+    def test_save_booking_without_service_defaults_to_first_catalog(self, db_session):
+        from app.models.booking import Booking, BookingSource
+
         fake_llm = FakeLLMProvider([])
         agent = AgentIntegrationService(db_session)
         booking_svc = BookingService(db_session)
@@ -452,11 +454,15 @@ class TestVapiSaveBookingPolish:
                 caller_phone=phone,
             )
         )
-        assert executed.success is False
-        assert executed.result.get("success") is False
-        assert "service" in (executed.presentation_instructions or "").lower() or "Basic Wash" in (
-            executed.presentation_instructions or ""
-        )
+        assert executed.success is True, executed.result
+        assert executed.result.get("success") is True
+        spoken = executed.presentation_instructions or ""
+        assert "booked" in spoken.lower()
+        booking_id = (executed.result.get("data") or {}).get("booking", {}).get("booking_id")
+        assert booking_id
+        booking = db_session.get(Booking, uuid.UUID(str(booking_id)))
+        assert booking is not None
+        assert booking.source == BookingSource.VOICE
 
 
 class TestProviderHttpWebhooks:

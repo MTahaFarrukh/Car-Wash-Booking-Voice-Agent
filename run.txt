@@ -72,6 +72,7 @@ npm run dev
 # Terminal 3 — WhatsApp bridge (Baileys)  OPTIONAL
 # ------------------------------------------------------------
 cd whatsapp-bridge
+# whatsapp-bridge/.env BACKEND_URL must match uvicorn port (8000 or 8001).
 npm start
 # Scan QR once. Bridge posts to backend /api/whatsapp/messages
 # Needs root .env: WHATSAPP_BRIDGE_SECRET, GEMINI_API_KEY, WHATSAPP_AGENT_MODE=auto

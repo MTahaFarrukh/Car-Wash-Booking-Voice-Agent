@@ -38,13 +38,13 @@ class TestMatchServiceRow:
 
 
 class TestResolveService:
-    def test_requires_service_when_missing(self):
+    def test_defaults_to_first_catalog_service_when_missing(self):
         rows = _rows()
         state = CallSessionState(call_id="c1")
         matched, err = _resolve_service(rows, {}, state)
-        assert matched is None
-        assert err is not None
-        assert "Basic Wash" in err
+        assert err is None
+        assert matched is not None
+        assert matched["name"] == "Basic Wash"
 
     def test_uses_session_selection(self):
         rows = _rows()

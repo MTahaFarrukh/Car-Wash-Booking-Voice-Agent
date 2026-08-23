@@ -79,9 +79,37 @@ export function BookingWizard() {
       try {
         const result = await api.getAvailability(bookingDate, serviceId);
         if (!cancelled) {
-          setSlots(result.alternatives ?? []);
-          if (!result.available) {
-            setSlotsError(result.message || "No available slots for this date");
+          const now = new Date();
+          const todayIso = [
+            now.getFullYear(),
+            String(now.getMonth() + 1).padStart(2, "0"),
+            String(now.getDate()).padStart(2, "0"),
+          ].join("-");
+          const raw = result.alternatives ?? [];
+          const filtered =
+            bookingDate === todayIso
+              ? raw.filter((slot) => {
+                  const [hh, mm] = slot.split(":").map(Number);
+                  if (Number.isNaN(hh) || Number.isNaN(mm)) return true;
+                  const slotDate = new Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate(),
+                    hh,
+                    mm,
+                    0,
+                    0,
+                  );
+                  return slotDate.getTime() > now.getTime();
+                })
+              : raw;
+          setSlots(filtered);
+          if (!result.available || filtered.length === 0) {
+            setSlotsError(
+              filtered.length === 0
+                ? result.message || "No available slots left for this date"
+                : result.message || "No available slots for this date",
+            );
           }
         }
       } catch (err) {

@@ -22,7 +22,7 @@ from app.services.slot_engine import (
     is_slot_free,
     requested_time_is_valid,
 )
-from app.services.time_utils import date_weekday, is_past_slot
+from app.services.time_utils import date_weekday, is_past_date, is_past_slot
 
 
 class AvailabilityService:
@@ -94,7 +94,8 @@ class AvailabilityService:
             service.duration_minutes,
         )
         available = filter_available_slots(candidates, service.duration_minutes, occupied)
-        return available
+        # Hide times that have already passed when booking for today.
+        return [slot for slot in available if not is_past_slot(booking_date, slot)]
 
     def check_availability(
         self,
@@ -130,7 +131,11 @@ class AvailabilityService:
             availability.slot_duration_minutes,
             service.duration_minutes,
         )
-        available_slots = filter_available_slots(candidates, service.duration_minutes, occupied)
+        available_slots = [
+            slot
+            for slot in filter_available_slots(candidates, service.duration_minutes, occupied)
+            if not is_past_slot(booking_date, slot)
+        ]
 
         if requested_time is None:
             return AvailabilityCheckResult(

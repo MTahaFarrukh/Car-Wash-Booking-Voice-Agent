@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import uuid
 from typing import Any
 
@@ -17,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
+# Free-tier bursts often return 429 mid tool-loop; brief backoff usually recovers.
+_MAX_429_ATTEMPTS = 4
+_429_BACKOFF_SECONDS = (1.5, 3.0, 6.0)
 
 
 class GeminiProvider(LLMProvider):
@@ -101,22 +105,40 @@ class GeminiProvider(LLMProvider):
             payload["toolConfig"] = {"functionCallingConfig": {"mode": "AUTO"}}
 
         url = f"{self.base_url}/models/{self.model}:generateContent"
-        try:
-            with httpx.Client(timeout=self.timeout_seconds) as client:
-                response = client.post(
-                    url,
-                    headers={
-                        "x-goog-api-key": self.api_key,
-                        "Content-Type": "application/json",
-                    },
-                    json=payload,
-                )
-        except httpx.TimeoutException as exc:
-            raise GeminiProviderError("Gemini request timed out") from exc
-        except httpx.HTTPError as exc:
-            raise GeminiProviderError("Gemini provider is unavailable") from exc
+        last_429: httpx.Response | None = None
+        for attempt in range(_MAX_429_RETRIES + 1):
+            try:
+                with httpx.Client(timeout=self.timeout_seconds) as client:
+                    response = client.post(
+                        url,
+                        headers={
+                            "x-goog-api-key": self.api_key,
+                            "Content-Type": "application/json",
+                        },
+                        json=payload,
+                    )
+            except httpx.TimeoutException as exc:
+                raise GeminiProviderError("Gemini request timed out") from exc
+            except httpx.HTTPError as exc:
+                raise GeminiProviderError("Gemini provider is unavailable") from exc
 
-        return self._handle_http_response(response)
+            if response.status_code != 429:
+                return self._handle_http_response(response)
+
+            last_429 = response
+            if attempt >= _MAX_429_RETRIES:
+                break
+            delay = _429_BACKOFF_SECONDS[min(attempt, len(_429_BACKOFF_SECONDS) - 1)]
+            logger.warning(
+                "gemini_rate_limited attempt=%s/%s sleep_s=%s detail=%s",
+                attempt + 1,
+                _MAX_429_RETRIES + 1,
+                delay,
+                self._safe_error_detail(response),
+            )
+            time.sleep(delay)
+
+        raise GeminiProviderError("Gemini rate limit / quota exceeded") from None
 
     def _handle_http_response(self, response: httpx.Response) -> LLMCompletionResult:
         if response.status_code == 429:

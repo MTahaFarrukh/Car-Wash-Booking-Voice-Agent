@@ -30,6 +30,12 @@ def is_past_slot(booking_date: date, booking_time: time, now: datetime | None = 
     return combine_date_time(booking_date, booking_time) < current.replace(tzinfo=None)
 
 
+def is_past_date(booking_date: date, now: datetime | None = None) -> bool:
+    """Return True when the calendar date is before today."""
+    current = now or datetime.now()
+    return booking_date < current.date()
+
+
 def intervals_overlap(
     start_a: time,
     duration_a_minutes: int,
