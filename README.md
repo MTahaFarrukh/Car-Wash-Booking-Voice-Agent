@@ -1,5 +1,18 @@
 # Sparkle Car Wash — AI Booking Platform
 
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![WhatsApp](https://img.shields.io/badge/WhatsApp-Baileys-25D366?logo=whatsapp&logoColor=white)](https://github.com/WhiskeySockets/Baileys)
+[![Gemini](https://img.shields.io/badge/LLM-Gemini-8E75B2?logo=googlegemini&logoColor=white)](https://ai.google.dev/)
+[![VAPI](https://img.shields.io/badge/Voice-VAPI-0F172A)](https://vapi.ai/)
+[![Phase](https://img.shields.io/badge/Phase-9%20Web%20App-2dd4bf)](#whats-built)
+[![Status](https://img.shields.io/badge/Status-Active-success)](https://github.com/MTahaFarrukh/Car-Wash-Booking-Voice-Agent)
+[![GitHub](https://img.shields.io/badge/GitHub-Car--Wash--Booking--Voice--Agent-181717?logo=github)](https://github.com/MTahaFarrukh/Car-Wash-Booking-Voice-Agent)
+
 Monorepo for **Sparkle Car Wash**: book, reschedule, and cancel washes through a shared booking engine, with WhatsApp (Gemini) and voice (VAPI / Uplift) on top.
 
 > Day-to-day startup commands live in [`run.txt`](run.txt). This README is the project overview — a fuller write-up can wait until the final pass.
@@ -148,5 +161,7 @@ Full template: [`.env.example`](.env.example). **Never commit** `.env`.
 ---
 
 ## License
+
+[![License](https://img.shields.io/badge/License-Private-lightgrey)](#license)
 
 Private course project — not for public distribution.
