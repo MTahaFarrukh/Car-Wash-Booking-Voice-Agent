@@ -1,8 +1,12 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   CalendarClock,
   Car,
   LayoutDashboard,
+  LogOut,
   MessageSquare,
   Mic,
   Settings,
@@ -11,6 +15,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAdminAuth } from "@/lib/admin-auth";
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -25,6 +30,14 @@ const NAV = [
 ];
 
 export function AdminSidebar({ pathname }: { pathname: string }) {
+  const { user, signOut } = useAdminAuth();
+  const router = useRouter();
+
+  async function onLogout() {
+    await signOut();
+    router.replace("/admin/login");
+  }
+
   return (
     <aside className="flex w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground">
       <div className="border-b border-sidebar-border px-5 py-5">
@@ -55,6 +68,19 @@ export function AdminSidebar({ pathname }: { pathname: string }) {
           );
         })}
       </nav>
+      <div className="border-t border-sidebar-border p-3">
+        <p className="truncate px-3 text-xs text-sidebar-foreground/70" title={user?.email ?? undefined}>
+          {user?.email ?? "Admin"}
+        </p>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="mt-2 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/80 transition hover:bg-sidebar-accent/70"
+        >
+          <LogOut className="size-4" />
+          Log out
+        </button>
+      </div>
     </aside>
   );
 }

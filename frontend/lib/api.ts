@@ -54,12 +54,16 @@ function formatDetail(payload: unknown): string {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const { getAccessToken } = await import("@/lib/supabase");
+  const token = await getAccessToken();
+
   let response: Response;
   try {
     response = await fetch(`${API_URL}${path}`, {
       ...init,
       headers: {
         "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init?.headers ?? {}),
       },
     });
@@ -83,6 +87,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const detail = formatDetail(data);
+    if (response.status === 401 && typeof window !== "undefined") {
+      const path = window.location.pathname;
+      if (path.startsWith("/admin") && path !== "/admin/login") {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- api client is not a Client Component
+        window.location.href = "/admin/login";
+      }
+    }
     if (response.status === 409) {
       throw new ApiError(
         409,
@@ -201,6 +212,9 @@ export const api = {
     request<WhatsAppActivity[]>(`/api/admin/whatsapp/activity${qs({ limit })}`),
 
   adminStatus: () => request<AdminStatus>("/api/admin/status"),
+
+  adminMe: () =>
+    request<{ id: string; email: string; role: string; auth_user_id: string }>("/api/admin/me"),
 
   voiceProviderStatus: () => request<VoiceProviderStatus>("/api/voice/provider"),
 };

@@ -436,7 +436,27 @@ class TestVapiSaveBookingPolish:
             conversation=conversation,
         )
         call_id = f"vapi-nosvc-{uuid.uuid4().hex[:10]}"
-        phone = f"+92323{uuid.uuid4().hex[:8]}"
+        phone = f"+92323{uuid.uuid4().int % 10_000_000:08d}"
+        from app.services.availability_service import AvailabilityService
+        from sqlalchemy import select
+        from app.models.service import Service
+
+        basic = db_session.scalar(select(Service).where(Service.name == "Basic Wash"))
+        assert basic is not None
+        availability = AvailabilityService(db_session)
+        booking_date = None
+        booking_time = None
+        for offset in range(1, 21):
+            from datetime import date, timedelta
+
+            candidate = date.today() + timedelta(days=offset)
+            slots = availability.get_available_slots(candidate, basic.id)
+            if slots:
+                booking_date = candidate
+                booking_time = slots[0]
+                break
+        assert booking_date and booking_time
+
         service.start_call(
             VoiceCallStartRequest(call_id=call_id, caller_phone=phone, provider="vapi")
         )
@@ -448,8 +468,8 @@ class TestVapiSaveBookingPolish:
                     "name": "Taha",
                     "phone": phone,
                     "vehicle": "Civic",
-                    "date": "2026-09-01",
-                    "time": "10:00",
+                    "date": booking_date.isoformat(),
+                    "time": booking_time.strftime("%H:%M"),
                 },
                 caller_phone=phone,
             )

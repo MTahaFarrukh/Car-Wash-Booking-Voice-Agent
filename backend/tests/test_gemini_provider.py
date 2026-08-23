@@ -206,7 +206,7 @@ class TestGeminiProvider:
 
     def test_rate_limit_error(self):
         provider = GeminiProvider(api_key="test-key")
-        with patch("httpx.Client") as client_cls:
+        with patch("httpx.Client") as client_cls, patch("app.llm.gemini_provider.time.sleep"):
             client = MagicMock()
             client_cls.return_value.__enter__.return_value = client
             client.post.return_value = _mock_response(429, {"error": {"message": "quota"}})

@@ -165,6 +165,11 @@ class Phase5ToolExecutor:
     @staticmethod
     def _booking_identity_block(state: ConversationState) -> AgentResult | None:
         from app.whatsapp.service import WhatsAppService
+        from app.whatsapp.state import ConversationState as WhatsAppConversationState
+
+        # Voice CallSessionState reuses this executor but does not use needs_* flags.
+        if not isinstance(state, WhatsAppConversationState):
+            return None
 
         if state.needs_phone or not state.phone:
             return AgentResult(
@@ -177,7 +182,10 @@ class Phase5ToolExecutor:
                     suggested_action="Ask for their mobile number with country code, then call find_or_create_customer",
                 ),
             )
-        if state.needs_name or WhatsAppService.is_placeholder_name(state.customer_name):
+        if state.needs_name or (
+            state.customer_name is not None
+            and WhatsAppService.is_placeholder_name(state.customer_name)
+        ):
             return AgentResult(
                 success=False,
                 data=None,

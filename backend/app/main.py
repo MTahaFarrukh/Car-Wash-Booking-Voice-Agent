@@ -1,9 +1,9 @@
 """FastAPI application entry point."""
 
+from fastapi import FastAPI, Response, status
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import engine
@@ -51,14 +51,25 @@ app.include_router(admin_router)
 
 @app.get("/health")
 def health_check() -> dict:
-    return {"status": "ok", "service": "Sparkle AI Receptionist API", "environment": settings.environment}
+    """Liveness probe — process is up (no secrets)."""
+    return {
+        "status": "ok",
+        "service": "Sparkle AI Receptionist API",
+        "environment": settings.environment,
+    }
 
 
 @app.get("/health/db")
-def health_db() -> dict:
+def health_db(response: Response) -> dict:
+    """Readiness probe — database connectivity (503 when unreachable)."""
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
-        return {"database": "connected"}
+        return {"status": "ok", "database": "connected"}
     except SQLAlchemyError as exc:
-        return {"database": "disconnected", "detail": str(exc)}
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {
+            "status": "error",
+            "database": "disconnected",
+            "detail": type(exc).__name__,
+        }

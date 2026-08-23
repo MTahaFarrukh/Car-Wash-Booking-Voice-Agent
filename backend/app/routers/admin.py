@@ -9,8 +9,10 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
+from app.auth.deps import require_admin
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.models.admin_user import AdminUser
 from app.models.booking import Booking, BookingSource, BookingStatus
 from app.models.call_log import CallLog, CallOutcome
 from app.models.customer import Customer
@@ -24,7 +26,11 @@ from app.schemas.admin import (
 )
 from app.voice.provider import create_voice_provider
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+router = APIRouter(
+    prefix="/api/admin",
+    tags=["admin"],
+    dependencies=[Depends(require_admin)],
+)
 
 
 def _booking_list_item(booking: Booking) -> BookingListItem:
@@ -48,6 +54,17 @@ def _booking_list_item(booking: Booking) -> BookingListItem:
         vehicle_label=vehicle_label,
         service_name=booking.service.name if booking.service else None,
     )
+
+
+@router.get("/me")
+def admin_me(admin: AdminUser = Depends(require_admin)) -> dict:
+    """Return the authenticated admin profile (for dashboard chrome)."""
+    return {
+        "id": str(admin.id),
+        "email": admin.email,
+        "role": admin.role,
+        "auth_user_id": str(admin.auth_user_id),
+    }
 
 
 @router.get("/bookings", response_model=list[BookingListItem])

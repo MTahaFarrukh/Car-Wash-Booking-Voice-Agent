@@ -105,8 +105,7 @@ class GeminiProvider(LLMProvider):
             payload["toolConfig"] = {"functionCallingConfig": {"mode": "AUTO"}}
 
         url = f"{self.base_url}/models/{self.model}:generateContent"
-        last_429: httpx.Response | None = None
-        for attempt in range(_MAX_429_RETRIES + 1):
+        for attempt in range(_MAX_429_ATTEMPTS):
             try:
                 with httpx.Client(timeout=self.timeout_seconds) as client:
                     response = client.post(
@@ -125,20 +124,19 @@ class GeminiProvider(LLMProvider):
             if response.status_code != 429:
                 return self._handle_http_response(response)
 
-            last_429 = response
-            if attempt >= _MAX_429_RETRIES:
+            if attempt >= _MAX_429_ATTEMPTS - 1:
                 break
             delay = _429_BACKOFF_SECONDS[min(attempt, len(_429_BACKOFF_SECONDS) - 1)]
             logger.warning(
                 "gemini_rate_limited attempt=%s/%s sleep_s=%s detail=%s",
                 attempt + 1,
-                _MAX_429_RETRIES + 1,
+                _MAX_429_ATTEMPTS,
                 delay,
                 self._safe_error_detail(response),
             )
             time.sleep(delay)
 
-        raise GeminiProviderError("Gemini rate limit / quota exceeded") from None
+        raise GeminiProviderError("Gemini rate limit / quota exceeded")
 
     def _handle_http_response(self, response: httpx.Response) -> LLMCompletionResult:
         if response.status_code == 429:

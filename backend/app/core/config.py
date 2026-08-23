@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     vapi_api_key: str = ""
     vapi_assistant_id: str = ""
     vapi_webhook_secret: str = ""
+    # Production frontend origin (merged into CORS). Example: https://app.vercel.app
+    frontend_url: str = ""
     cors_origins: str = "http://localhost:3000"
     environment: str = "development"
     whatsapp_bridge_secret: str = ""
@@ -52,12 +54,20 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 800
     llm_timeout_seconds: float = 45.0
     llm_max_tool_calls: int = 8
-    # auto = LLM when configured, else rule-based; llm = require LLM; rule = force Phase 6 agent
+    # auto = LLM when API key set, else rule-based; llm = prefer LLM; rule = force Phase 6 agent
     whatsapp_agent_mode: str = "auto"
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        origins: list[str] = []
+        for raw in (self.cors_origins or "").split(","):
+            origin = raw.strip()
+            if origin and origin not in origins:
+                origins.append(origin)
+        frontend = (self.frontend_url or "").strip().rstrip("/")
+        if frontend and frontend not in origins:
+            origins.append(frontend)
+        return origins
 
     @property
     def llm_is_configured(self) -> bool:

@@ -9,7 +9,7 @@
 [![WhatsApp](https://img.shields.io/badge/WhatsApp-Baileys-25D366?logo=whatsapp&logoColor=white)](https://github.com/WhiskeySockets/Baileys)
 [![Gemini](https://img.shields.io/badge/LLM-Gemini-8E75B2?logo=googlegemini&logoColor=white)](https://ai.google.dev/)
 [![VAPI](https://img.shields.io/badge/Voice-VAPI-0F172A)](https://vapi.ai/)
-[![Phase](https://img.shields.io/badge/Phase-9%20Web%20App-2dd4bf)](#whats-built)
+[![Phase](https://img.shields.io/badge/Phase-10A%20Admin%20Auth-2dd4bf)](#whats-built)
 [![Status](https://img.shields.io/badge/Status-Active-success)](https://github.com/MTahaFarrukh/Car-Wash-Booking-Voice-Agent)
 [![GitHub](https://img.shields.io/badge/GitHub-Car--Wash--Booking--Voice--Agent-181717?logo=github)](https://github.com/MTahaFarrukh/Car-Wash-Booking-Voice-Agent)
 
@@ -29,8 +29,11 @@ Monorepo for **Sparkle Car Wash**: book, reschedule, and cancel washes through a
 | Voice channel (Phase 8) + VAPI / Uplift adapters (8.1) | Done — live VAPI booking verified |
 | Browser VAPI voice booking (`/voice`) | Done — uses `@vapi-ai/web` + public key |
 | Shared Phase 5 tool layer (no second booking engine) | Done |
+| Admin auth (Supabase) + Render/Baileys deploy prep | Done — Phase 10A (not deployed yet) |
 
 Voice, WhatsApp, and website bookings all use the same booking engine. Manual web bookings use `BookingSource.dashboard`; voice uses `voice`; WhatsApp uses `whatsapp`.
+
+Production prep notes: [`DEPLOYMENT.md`](DEPLOYMENT.md). Admin login: `/admin/login` (public site stays open).
 
 ---
 

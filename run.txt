@@ -147,3 +147,15 @@ C:\ngrok\ngrok.exe http 8000
 #   NEXT_PUBLIC_WHATSAPP_NUMBER
 #   NEXT_PUBLIC_VAPI_PUBLIC_KEY
 #   NEXT_PUBLIC_VAPI_ASSISTANT_ID
+#   NEXT_PUBLIC_SUPABASE_URL
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY
+#
+# Admin auth (Phase 10A):
+#   1) Create user in Supabase Auth (email/password)
+#   2) alembic upgrade head
+#   3) python -m scripts.seed_admin --email … --auth-user-id …
+#   4) Open http://localhost:3000/admin/login
+#
+# Render start (backend, when ready — do not deploy until you choose):
+#   uvicorn app.main:app --host 0.0.0.0 --port $PORT
+# See DEPLOYMENT.md
