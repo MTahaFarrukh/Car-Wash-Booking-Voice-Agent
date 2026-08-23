@@ -42,6 +42,14 @@ class CustomerVehicleService:
     def find_or_create_customer(self, *, name: str, phone: str, email: str | None = None) -> Customer:
         existing = self.find_customer_by_phone(phone)
         if existing is not None:
+            # Upgrade placeholder WhatsApp names when the customer later gives a real name.
+            placeholder = existing.name.lower().startswith("whatsapp customer")
+            if placeholder and name and not name.lower().startswith("whatsapp customer"):
+                existing.name = name
+                if email is not None:
+                    existing.email = email
+                self.db.commit()
+                self.db.refresh(existing)
             return existing
         return self.create_customer(name=name, phone=phone, email=email)
 

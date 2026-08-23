@@ -8,9 +8,29 @@ import pino from "pino";
 
 import { config } from "./config.js";
 import { forwardMessageToBackend } from "./backend.js";
-import { normalizeIncomingMessage } from "./normalize.js";
+import { jidToPhoneNumber, normalizeIncomingMessage } from "./normalize.js";
 
 const logger = pino({ level: config.logLevel });
+
+/**
+ * Best-effort LID → phone JID lookup from Baileys session mapping.
+ * @param {Awaited<ReturnType<typeof makeWASocket>>} sock
+ * @param {string} lidJid
+ * @returns {Promise<string>}
+ */
+async function resolveLidPhone(sock, lidJid) {
+  try {
+    const mapping = sock?.signalRepository?.lidMapping;
+    if (!mapping?.getPNForLID) {
+      return "";
+    }
+    const pnJid = await mapping.getPNForLID(lidJid);
+    return jidToPhoneNumber(pnJid || "");
+  } catch (err) {
+    logger.debug({ err, lidJid }, "LID phone lookup failed");
+    return "";
+  }
+}
 
 /**
  * Start the Baileys WhatsApp connection and wire message handling.
@@ -73,8 +93,17 @@ export async function startWhatsAppBridge() {
           continue;
         }
 
+        if (!normalized.phone_number && normalized.sender_id.endsWith("@lid")) {
+          normalized.phone_number = await resolveLidPhone(sock, normalized.sender_id);
+        }
+
         logger.info(
-          { messageId: normalized.message_id, sender: normalized.sender_id },
+          {
+            messageId: normalized.message_id,
+            sender: normalized.sender_id,
+            phone: normalized.phone_number || null,
+            pushName: normalized.push_name || null,
+          },
           "Incoming WhatsApp message"
         );
 

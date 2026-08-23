@@ -209,6 +209,8 @@ class LLMConversationAgent:
             "customer_id": str(state.customer_id) if state.customer_id else None,
             "customer_name": state.customer_name,
             "phone": state.phone,
+            "needs_name": state.needs_name,
+            "needs_phone": state.needs_phone,
             "selected_vehicle_id": str(state.selected_vehicle_id) if state.selected_vehicle_id else None,
             "selected_vehicle_label": state.selected_vehicle_label,
             "selected_service_id": str(state.selected_service_id) if state.selected_service_id else None,

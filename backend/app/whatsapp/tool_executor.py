@@ -33,8 +33,8 @@ logger = logging.getLogger(__name__)
 # LLM-oriented descriptions (Phase 5 handlers remain unchanged).
 TOOL_DESCRIPTIONS: dict[str, str] = {
     "find_or_create_customer": (
-        "Find an existing customer by phone or create one when first contacting Sparkle Car Wash. "
-        "Use the WhatsApp phone already known in session context when needed."
+        "Find or create the customer profile. Call this after the customer gives their real name "
+        "and/or mobile number. Use the session phone when available."
     ),
     "get_customer": "Look up an existing customer by customer_id or phone before booking operations.",
     "create_vehicle": (
@@ -138,6 +138,10 @@ class Phase5ToolExecutor:
             )
 
         cleaned = self._prepare_arguments(name, dict(arguments or {}), state)
+        if name == "create_booking":
+            blocked = self._booking_identity_block(state)
+            if blocked is not None:
+                return blocked
         model_cls = INPUT_MODELS[name]
         try:
             payload = model_cls.model_validate(cleaned)
@@ -157,6 +161,34 @@ class Phase5ToolExecutor:
         result = self._handlers[name](payload)
         self._update_state_from_result(name, result, state)
         return result
+
+    @staticmethod
+    def _booking_identity_block(state: ConversationState) -> AgentResult | None:
+        from app.whatsapp.service import WhatsAppService
+
+        if state.needs_phone or not state.phone:
+            return AgentResult(
+                success=False,
+                data=None,
+                error=AgentError(
+                    error_code="VALIDATION_ERROR",
+                    message="Customer mobile number is required before booking",
+                    retryable=True,
+                    suggested_action="Ask for their mobile number with country code, then call find_or_create_customer",
+                ),
+            )
+        if state.needs_name or WhatsAppService.is_placeholder_name(state.customer_name):
+            return AgentResult(
+                success=False,
+                data=None,
+                error=AgentError(
+                    error_code="VALIDATION_ERROR",
+                    message="Customer name is required before booking",
+                    retryable=True,
+                    suggested_action="Ask for their full name, then call find_or_create_customer",
+                ),
+            )
+        return None
 
     def _prepare_arguments(self, name: str, arguments: dict[str, Any], state: ConversationState) -> dict[str, Any]:
         # Never trust the model to switch customers mid-session.
@@ -198,6 +230,10 @@ class Phase5ToolExecutor:
                     state.customer_id = uuid_from_string(data["customer_id"])
                 state.customer_name = data.get("name") or state.customer_name
                 state.phone = data.get("phone") or state.phone
+                from app.whatsapp.service import WhatsAppService
+
+                state.needs_name = WhatsAppService.is_placeholder_name(state.customer_name)
+                state.needs_phone = not bool(state.phone)
             elif name == "list_services":
                 state.cached_services = data.get("services") or []
             elif name == "get_customer_vehicles":

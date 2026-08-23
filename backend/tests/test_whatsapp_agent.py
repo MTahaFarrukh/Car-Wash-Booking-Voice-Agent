@@ -42,8 +42,14 @@ def _pick_available_slot(db_session, service_id) -> tuple[date, time]:
     raise AssertionError("No available slot found")
 
 
+def _phone_suffix(width: int = 8) -> str:
+    """Numeric-only suffix so generated phones stay E.164 digit-valid."""
+    modulo = 10**width
+    return f"{uuid.uuid4().int % modulo:0{width}d}"
+
+
 def _whatsapp_payload(**overrides) -> dict:
-    suffix = uuid.uuid4().hex[:8]
+    suffix = _phone_suffix()
     payload = {
         "message_id": f"msg-{suffix}",
         "sender_id": f"92300{suffix}@s.whatsapp.net",
@@ -110,7 +116,7 @@ class TestWhatsAppAgent:
         assert customer.name.split()[0] in response.json()["message"] or "Hi" in response.json()["message"]
 
     def test_new_customer_creation(self, db_session):
-        suffix = uuid.uuid4().hex[:8]
+        suffix = _phone_suffix()
         phone = f"+92331{suffix}"
         payload = _whatsapp_payload(
             phone_number=phone,
@@ -139,7 +145,7 @@ class TestWhatsAppAgent:
 
         payload = _whatsapp_payload(
             phone_number=customer.phone,
-            sender_id=f"92300{uuid.uuid4().hex[:6]}@s.whatsapp.net",
+            sender_id=f"92300{_phone_suffix(6)}@s.whatsapp.net",
             text=(
                 f"Book my {vehicle.make} {vehicle.model} for premium wash "
                 f"on {booking_date.isoformat()} at {slot.strftime('%H:%M')}. Yes"
@@ -150,7 +156,7 @@ class TestWhatsAppAgent:
         assert "confirmed" in response.json()["message"].lower() or "set" in response.json()["message"].lower()
 
     def test_multiple_vehicle_ambiguity(self, db_session):
-        suffix = uuid.uuid4().hex[:8]
+        suffix = _phone_suffix()
         phone = f"+92332{suffix}"
         sender = f"92332{suffix}@s.whatsapp.net"
 
@@ -192,7 +198,7 @@ class TestWhatsAppAgent:
 
         first = _whatsapp_payload(
             phone_number=customer.phone,
-            sender_id=f"92333{uuid.uuid4().hex[:6]}@s.whatsapp.net",
+            sender_id=f"92333{_phone_suffix(6)}@s.whatsapp.net",
             text=(
                 f"Book my {vehicle.make} {vehicle.model} for basic wash "
                 f"on {booking_date.isoformat()} at {slot.strftime('%H:%M')}. Yes"
@@ -201,8 +207,8 @@ class TestWhatsAppAgent:
         assert client.post("/api/whatsapp/messages", json=first, headers=BRIDGE_HEADERS).status_code == 200
 
         second = _whatsapp_payload(
-            phone_number=f"+92334{uuid.uuid4().hex[:6]}",
-            sender_id=f"92334{uuid.uuid4().hex[:6]}@s.whatsapp.net",
+            phone_number=f"+92334{_phone_suffix(6)}",
+            sender_id=f"92334{_phone_suffix(6)}@s.whatsapp.net",
             text=(
                 f"Book my Honda Civic for basic wash on {booking_date.isoformat()} "
                 f"at {slot.strftime('%H:%M')}. Yes"
@@ -214,7 +220,7 @@ class TestWhatsAppAgent:
         assert "isn't available" in message or "open times" in message or "sorry" in message
 
     def test_successful_booking_with_confirmation(self, db_session):
-        suffix = uuid.uuid4().hex[:8]
+        suffix = _phone_suffix()
         phone = f"+92335{suffix}"
         sender = f"92335{suffix}@s.whatsapp.net"
         service = db_session.scalar(select(Service).where(Service.name == "Basic Wash"))
@@ -254,7 +260,7 @@ class TestWhatsAppAgent:
         assert "confirmed" in confirm.json()["message"].lower()
 
     def test_cancellation_single_active_booking(self, db_session):
-        suffix = uuid.uuid4().hex[:8]
+        suffix = _phone_suffix()
         phone = f"+92336{suffix}"
         sender = f"92336{suffix}@s.whatsapp.net"
         service = db_session.scalar(select(Service).where(Service.name == "Basic Wash"))
@@ -289,7 +295,7 @@ class TestWhatsAppAgent:
         assert "cancelled" in cancel.json()["message"].lower()
 
     def test_reschedule_booking(self, db_session):
-        suffix = uuid.uuid4().hex[:8]
+        suffix = _phone_suffix()
         phone = f"+92337{suffix}"
         sender = f"92337{suffix}@s.whatsapp.net"
         service = db_session.scalar(select(Service).where(Service.name == "Basic Wash"))
@@ -353,7 +359,7 @@ class TestWhatsAppAgent:
         assert "text messages" in response.json()["message"].lower()
 
     def test_agent_tool_failure_returns_safe_message(self, db_session):
-        suffix = uuid.uuid4().hex[:8]
+        suffix = _phone_suffix()
         phone = f"+92338{suffix}"
         sender = f"92338{suffix}@s.whatsapp.net"
         service = db_session.scalar(select(Service).where(Service.name == "Basic Wash"))
@@ -376,7 +382,7 @@ class TestWhatsAppAgent:
         )
 
         failing_payload = _whatsapp_payload(
-            message_id=f"fail-{uuid.uuid4().hex[:8]}",
+            message_id=f"fail-{_phone_suffix()}",
             phone_number=phone,
             sender_id=sender,
             text="Yes",
@@ -403,7 +409,7 @@ class TestWhatsAppAgent:
         ):
             response = client.post(
                 "/api/whatsapp/messages",
-                json=_whatsapp_payload(message_id=f"svc-{uuid.uuid4().hex[:6]}", text="What services do you have?"),
+                json=_whatsapp_payload(message_id=f"svc-{_phone_suffix(6)}", text="What services do you have?"),
                 headers=BRIDGE_HEADERS,
             )
         assert response.status_code == 200

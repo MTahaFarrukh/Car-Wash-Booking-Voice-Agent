@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -15,6 +17,8 @@ from app.services.booking_service import BookingService
 from app.whatsapp.conversation import WhatsAppConversationAgent
 from app.whatsapp.parser import uuid_from_string
 from app.whatsapp.state import ConversationState, conversation_state_store
+
+_PLACEHOLDER_NAME_RE = re.compile(r"^whatsapp customer\b", re.IGNORECASE)
 
 
 class WhatsAppService:
@@ -62,20 +66,75 @@ class WhatsAppService:
         return self._persist_and_reply(payload, reply_text)
 
     def _ensure_customer(self, state: ConversationState, payload: WhatsAppIncomingMessage) -> None:
-        state.phone = payload.phone_number
-        lookup = self.agent.get_customer(CustomerLookupInput(phone=payload.phone_number))
+        phone = self._resolved_phone(payload)
+        push_name = (payload.push_name or "").strip() or None
+
+        if not phone:
+            state.needs_phone = True
+            # Keep any previously resolved phone on this sender session.
+            if not state.phone:
+                state.phone = None
+            if state.customer_id and state.customer_name:
+                state.needs_name = self.is_placeholder_name(state.customer_name)
+            else:
+                state.needs_name = True
+            return
+
+        state.phone = phone
+        state.needs_phone = False
+
+        lookup = self.agent.get_customer(CustomerLookupInput(phone=phone))
         if lookup.success and lookup.data:
             state.customer_id = uuid_from_string(lookup.data["customer_id"])
             state.customer_name = lookup.data.get("name")
+            if self.is_placeholder_name(state.customer_name) and push_name:
+                updated = self.agent.find_or_create_customer(
+                    CustomerToolInput(name=push_name, phone=phone)
+                )
+                if updated.success and updated.data:
+                    state.customer_name = updated.data.get("name") or push_name
+            state.needs_name = self.is_placeholder_name(state.customer_name)
             return
 
-        display_name = self._default_customer_name(payload.phone_number)
+        # Prefer WhatsApp profile name; otherwise create a placeholder and ask later.
+        display_name = push_name if push_name else self._default_customer_name(phone)
         created = self.agent.find_or_create_customer(
-            CustomerToolInput(name=display_name, phone=payload.phone_number)
+            CustomerToolInput(name=display_name, phone=phone)
         )
         if created.success and created.data:
             state.customer_id = uuid_from_string(created.data["customer_id"])
             state.customer_name = created.data.get("name")
+            state.needs_name = self.is_placeholder_name(state.customer_name)
+
+    @classmethod
+    def is_placeholder_name(cls, name: str | None) -> bool:
+        if not name or not str(name).strip():
+            return True
+        return bool(_PLACEHOLDER_NAME_RE.match(str(name).strip()))
+
+    @staticmethod
+    def _resolved_phone(payload: WhatsAppIncomingMessage) -> str | None:
+        """Return a real mobile phone, never a WhatsApp LID disguised as digits."""
+        raw = (payload.phone_number or "").strip()
+        sender = payload.sender_id or ""
+        digits = re.sub(r"\D", "", raw)
+
+        if sender.endswith("@lid"):
+            lid_digits = re.sub(r"\D", "", sender.split("@", 1)[0].split(":", 1)[0])
+            # Bridge mistakenly used LID digits as the phone.
+            if not digits or digits == lid_digits:
+                return None
+
+        if 10 <= len(digits) <= 15:
+            return f"+{digits}"
+
+        # Fallback: phone-number JID (never @lid).
+        if sender.endswith("@s.whatsapp.net") or sender.endswith("@c.us"):
+            jid_digits = re.sub(r"\D", "", sender.split("@", 1)[0].split(":", 1)[0])
+            if 10 <= len(jid_digits) <= 15:
+                return f"+{jid_digits}"
+
+        return None
 
     @staticmethod
     def _default_customer_name(phone_number: str) -> str:

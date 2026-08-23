@@ -14,6 +14,8 @@ class ConversationState:
     customer_id: uuid.UUID | None = None
     customer_name: str | None = None
     phone: str | None = None
+    needs_name: bool = False
+    needs_phone: bool = False
     selected_vehicle_id: uuid.UUID | None = None
     selected_vehicle_label: str | None = None
     selected_service_id: uuid.UUID | None = None

@@ -84,8 +84,13 @@ def _make_service(db_session, fake: FakeLLMProvider) -> WhatsAppService:
     return WhatsAppService(db_session, conversation=conversation)
 
 
+def _phone_suffix(width: int = 8) -> str:
+    modulo = 10 ** width
+    return f"{uuid.uuid4().int % modulo:0{width}d}"
+
+
 def _payload(**overrides) -> WhatsAppIncomingMessage:
-    suffix = uuid.uuid4().hex[:8]
+    suffix = _phone_suffix()
     data = {
         "message_id": f"llm-{suffix}",
         "sender_id": f"92300{suffix}@s.whatsapp.net",
@@ -147,7 +152,7 @@ class TestWhatsAppLLMAgent:
     def test_natural_language_booking_flow(self, db_session):
         service_row = db_session.scalar(select(Service).where(Service.name == "Premium Wash"))
         booking_date, slot = _pick_available_slot(db_session, service_row.id)
-        suffix = uuid.uuid4().hex[:8]
+        suffix = _phone_suffix()
         phone = f"+92341{suffix}"
         sender = f"92341{suffix}@s.whatsapp.net"
 
@@ -231,7 +236,7 @@ class TestWhatsAppLLMAgent:
             ]
         )
         service = _make_service(db_session, fake)
-        suffix = uuid.uuid4().hex[:8]
+        suffix = _phone_suffix()
         first_payload = _payload(
             message_id=f"mt-1-{suffix}",
             sender_id=f"92342{suffix}@s.whatsapp.net",
@@ -260,7 +265,7 @@ class TestWhatsAppLLMAgent:
                 ),
             ]
         )
-        suffix = uuid.uuid4().hex[:8]
+        suffix = _phone_suffix()
         phone = f"+92343{suffix}"
         agent = AgentIntegrationService(db_session)
         created = agent.find_or_create_customer(CustomerToolInput(name="Multi", phone=phone))
@@ -336,7 +341,7 @@ class TestWhatsAppLLMAgent:
     def test_successful_booking_requires_create_tool(self, db_session):
         service_row = db_session.scalar(select(Service).where(Service.name == "Basic Wash"))
         booking_date, slot = _pick_available_slot(db_session, service_row.id)
-        suffix = uuid.uuid4().hex[:8]
+        suffix = _phone_suffix()
         phone = f"+92344{suffix}"
         sender = f"92344{suffix}@s.whatsapp.net"
 
@@ -440,7 +445,7 @@ class TestWhatsAppLLMAgent:
     def test_cancellation_via_tool(self, db_session):
         service_row = db_session.scalar(select(Service).where(Service.name == "Basic Wash"))
         booking_date, slot = _pick_available_slot(db_session, service_row.id)
-        suffix = uuid.uuid4().hex[:8]
+        suffix = _phone_suffix()
         phone = f"+92345{suffix}"
         sender = f"92345{suffix}@s.whatsapp.net"
         agent = AgentIntegrationService(db_session)
@@ -482,7 +487,7 @@ class TestWhatsAppLLMAgent:
         booking_date, slots = _pick_available_slots(db_session, service_row.id, min_slots=2)
         new_slot = slots[1]
         original_slot = slots[0]
-        suffix = uuid.uuid4().hex[:8]
+        suffix = _phone_suffix()
         phone = f"+92346{suffix}"
         sender = f"92346{suffix}@s.whatsapp.net"
         agent = AgentIntegrationService(db_session)
@@ -575,7 +580,7 @@ class TestWhatsAppLLMAgent:
     def test_duplicate_booking_tool_result(self, db_session):
         service_row = db_session.scalar(select(Service).where(Service.name == "Basic Wash"))
         booking_date, slot = _pick_available_slot(db_session, service_row.id)
-        suffix = uuid.uuid4().hex[:8]
+        suffix = _phone_suffix()
         phone = f"+92347{suffix}"
         sender = f"92347{suffix}@s.whatsapp.net"
         from app.models.booking import BookingSource
