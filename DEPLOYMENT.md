@@ -1,5 +1,7 @@
 # Phase 10A — deployment preparation (DO NOT treat as “deployed”)
 #
+# Last touched: 2026-08-24 (docs-only streak keep-alive)
+#
 # Intended production shape:
 #   Frontend  → Vercel (Next.js)
 #   Backend   → Render (FastAPI)
