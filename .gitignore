@@ -2,6 +2,7 @@
 .env
 .env.local
 .env.*.local
+deployment.env
 !.env.example
 !frontend/.env.local.example
 

@@ -1,112 +1,79 @@
-# Phase 10B — FastAPI on Render
+# Phase 10B+ — Deployment
 
 Last touched: 2026-08-26
 
 Intended production shape:
 
-- Frontend → Vercel (Next.js) — not this step
-- Backend → Render (FastAPI) — **this step**
+- Frontend → Vercel (Next.js)
+- Backend → Render (FastAPI) — **live**
 - Database / Auth → Supabase
 - Voice → VAPI
 - LLM → Gemini
-- WhatsApp → always-on Baileys host (not this step)
+- WhatsApp → always-on Baileys host (not yet)
 
-## Deploy status (2026-08-26)
+## Backend (Render) — live
 
-Prepared and attempted CLI deploy of service `sparkle-api` from
-`https://github.com/MTahaFarrukh/Car-Wash-Booking-Voice-Agent.git` (`main`, `rootDir: backend`).
-
-**Blocked by Render billing:** API returned `402 Payment information is required`.
-Add a payment method at https://dashboard.render.com/billing , then re-run create/deploy
-(or ask the agent to retry). Until `/health` succeeds on the live HTTPS URL, this is
-**not** considered deployed.
-
-Local pre-checks (passed):
-
-- `pytest -q` → 164 passed, 1 skipped
-- `/health` is public (no auth)
-- Admin routes remain Bearer + `admin_users`
-- `DATABASE_URL` points at Supabase pooler (`sslmode` set)
-- No `.env` committed; service-role not used by frontend
-
-## Render service settings
-
-| Setting | Value |
-|--------|--------|
-| Service name | `sparkle-api` |
+| | |
+|--|--|
+| Service | `Car-Wash-Booking-Voice-Agent` (`srv-da7hjom417fc73924v90`) |
+| URL | https://car-wash-booking-voice-agent.onrender.com |
 | Root directory | `backend` |
-| Runtime | Python 3 (`PYTHON_VERSION=3.12.0` in blueprint) |
-| Build | `pip install -r requirements.txt` |
-| Pre-deploy / release | `alembic upgrade head` |
-| Start | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
-| Health check | `/health` |
-| Plan | free (when billing allows) |
-| Blueprint | [`render.yaml`](render.yaml) |
+| Health | `GET /health` → ok |
+| DB | `GET /health/db` → connected |
+| Admin | `GET /api/admin/me` → 401 without Bearer (expected) |
 
-## Environment variables (Render Dashboard — secrets never in git)
+Build / start (as configured on Render):
 
-### Required for a healthy API
+- Build: `pip install -r requirements.txt`
+- Pre-deploy: `alembic upgrade head` (if configured)
+- Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Health check: `/health`
 
-| Variable | Notes |
-|----------|--------|
-| `DATABASE_URL` | Supabase Postgres (prefer pooler + `sslmode=require`) |
-| `SUPABASE_URL` | Project URL |
-| `SUPABASE_ANON_KEY` | Anon key — used to verify admin JWTs |
-| `ENVIRONMENT` | `production` |
-| `CORS_ORIGINS` | Comma-separated production frontend origins (**no `*`**) |
-| `FRONTEND_URL` | Optional; merged into CORS (set to Vercel URL when ready) |
+### CORS (required before the website can call the API)
 
-### LLM / WhatsApp / Voice (existing app config)
+Set on the Render service (Dashboard → Environment):
 
-| Variable | Suggested production value |
-|----------|----------------------------|
-| `LLM_PROVIDER` | `gemini` |
-| `GEMINI_API_KEY` | secret |
-| `GEMINI_MODEL` | match local (currently `gemini-3.6-flash` in repo defaults) |
-| `WHATSAPP_AGENT_MODE` | `auto` |
-| `WHATSAPP_BRIDGE_SECRET` | shared with Baileys bridge |
-| `VOICE_PROVIDER` | `vapi` |
-| `VOICE_WEBHOOK_SECRET` | secret |
-| `VAPI_API_KEY` | secret |
-| `VAPI_ASSISTANT_ID` | assistant UUID |
-| `VAPI_WEBHOOK_SECRET` | secret |
+```text
+FRONTEND_URL=https://car-wash-booking-voice-agent.vercel.app
+CORS_ORIGINS=https://car-wash-booking-voice-agent.vercel.app
+```
 
-### Optional / not required for admin JWT verify
+Do **not** use `CORS_ORIGINS=*`.
 
-| Variable | Notes |
-|----------|--------|
-| `SUPABASE_SERVICE_ROLE_KEY` | Backend-only if ever needed; **never** put on Vercel / frontend |
+Redeploy / restart the Render service after changing env vars.
 
-Do **not** set `CORS_ORIGINS=*`.
+## Frontend (Vercel) — 404 fix
 
-Until Vercel exists, leave `CORS_ORIGINS` / `FRONTEND_URL` empty (or set only known HTTPS origins). Browser admin against the API will need the real frontend origin later.
+Symptom: `https://car-wash-booking-voice-agent.vercel.app/` → `404 NOT_FOUND`
 
-## Post-deploy verification checklist
+Cause: this repo is a **monorepo**. There is **no** `package.json` at the repo root. The Next.js app lives in `frontend/`. If Vercel Root Directory is empty / `.`, the project has nothing to deploy → platform `NOT_FOUND`.
 
-Once the service is live:
+### Fix in Vercel Dashboard
 
-1. `GET https://<service>.onrender.com/health` → 200
-2. `GET https://<service>.onrender.com/docs` → 200
-3. `GET https://<service>.onrender.com/health/db` → `{"status":"ok","database":"connected"}`
-4. `GET /api/admin/me` without token → 401
-5. `GET /api/admin/me` with non-admin Bearer → 403
-6. `GET /api/admin/me` with seeded admin Bearer → 200
+1. Project → **Settings → General → Root Directory** → set to **`frontend`** → Save
+2. **Settings → Environment Variables** (Production), add:
 
-Free instances spin down after ~15 minutes idle (cold start ~30–60s).
+| Name | Value |
+|------|--------|
+| `NEXT_PUBLIC_API_URL` | `https://car-wash-booking-voice-agent.onrender.com` |
+| `NEXT_PUBLIC_SUPABASE_URL` | (same as local / Supabase project URL) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | (anon key only — never service role) |
+| `NEXT_PUBLIC_WHATSAPP_NUMBER` | digits only |
+| `NEXT_PUBLIC_VAPI_PUBLIC_KEY` | VAPI **public** key |
+| `NEXT_PUBLIC_VAPI_ASSISTANT_ID` | assistant id |
 
-## Admin bootstrap (if not already done on Supabase)
+3. **Deployments → Redeploy** the latest commit (or push an empty commit / “Redeploy”)
 
-1. Create email/password user in Supabase Auth.
-2. From a machine with `DATABASE_URL`:  
-   `python -m scripts.seed_admin --email … --auth-user-id …`
+Optional: `frontend/vercel.json` is present for framework hints; Root Directory is what actually matters.
 
-## Baileys (unchanged — not deploying now)
+### Verify after redeploy
 
-Prefer a separate always-on host with durable `auth_info`. Do not use Render free web sleep for Baileys.
+- `https://car-wash-booking-voice-agent.vercel.app/` → landing page
+- `/book`, `/voice`, `/admin/login` load
+- Admin login talks to Render `/api/admin/me` (CORS must include the Vercel origin)
 
 ## Security notes
 
-- `/api/admin/*` requires Supabase Bearer + active `admin_users` row
-- Public booking / services / availability remain open
-- CORS is origin-list based
-- Service role key stays server-only
+- Never put `SUPABASE_SERVICE_ROLE_KEY` on Vercel
+- Never commit `.env`, `frontend/.env.local`, or `deployment.env`
+- Free Render instances may cold-start after ~15 minutes idle
