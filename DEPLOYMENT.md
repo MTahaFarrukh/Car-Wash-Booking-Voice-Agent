@@ -1,79 +1,40 @@
 # Phase 10B+ — Deployment
 
-Last touched: 2026-08-26
+Last touched: 2026-08-27
 
-Intended production shape:
-
-- Frontend → Vercel (Next.js)
-- Backend → Render (FastAPI) — **live**
-- Database / Auth → Supabase
-- Voice → VAPI
-- LLM → Gemini
-- WhatsApp → always-on Baileys host (not yet)
-
-## Backend (Render) — live
+## Live URLs
 
 | | |
 |--|--|
-| Service | `Car-Wash-Booking-Voice-Agent` (`srv-da7hjom417fc73924v90`) |
-| URL | https://car-wash-booking-voice-agent.onrender.com |
-| Root directory | `backend` |
+| Frontend | https://car-wash-booking-voice-agent.vercel.app |
+| Backend | https://car-wash-booking-voice-agent.onrender.com |
 | Health | `GET /health` → ok |
-| DB | `GET /health/db` → connected |
-| Admin | `GET /api/admin/me` → 401 without Bearer (expected) |
 
-Build / start (as configured on Render):
+## VAPI Server URL (critical)
 
-- Build: `pip install -r requirements.txt`
-- Pre-deploy: `alembic upgrade head` (if configured)
-- Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-- Health check: `/health`
+Tool calls must hit Render, **not** a local ngrok tunnel.
 
-### CORS (required before the website can call the API)
+Expected assistant + `save_booking` tool server URL:
 
-Set on the Render service (Dashboard → Environment):
+`https://car-wash-booking-voice-agent.onrender.com/api/voice/vapi/webhook`
+
+If voice says there was a “technical” problem and no booking appears, check VAPI Dashboard → Assistant / Tools → Server URL.
+
+## Vercel
+
+- Root Directory: `frontend`
+- Framework Preset: **Next.js** (not Other)
+- `NEXT_PUBLIC_API_URL=https://car-wash-booking-voice-agent.onrender.com`
+
+## Render CORS
 
 ```text
 FRONTEND_URL=https://car-wash-booking-voice-agent.vercel.app
 CORS_ORIGINS=https://car-wash-booking-voice-agent.vercel.app
 ```
 
-Do **not** use `CORS_ORIGINS=*`.
+## Notes
 
-Redeploy / restart the Render service after changing env vars.
-
-## Frontend (Vercel) — 404 fix
-
-Symptom: `https://car-wash-booking-voice-agent.vercel.app/` → `404 NOT_FOUND`
-
-Cause: this repo is a **monorepo**. There is **no** `package.json` at the repo root. The Next.js app lives in `frontend/`. If Vercel Root Directory is empty / `.`, the project has nothing to deploy → platform `NOT_FOUND`.
-
-### Fix in Vercel Dashboard
-
-1. Project → **Settings → General → Root Directory** → set to **`frontend`** → Save
-2. **Settings → Environment Variables** (Production), add:
-
-| Name | Value |
-|------|--------|
-| `NEXT_PUBLIC_API_URL` | `https://car-wash-booking-voice-agent.onrender.com` |
-| `NEXT_PUBLIC_SUPABASE_URL` | (same as local / Supabase project URL) |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | (anon key only — never service role) |
-| `NEXT_PUBLIC_WHATSAPP_NUMBER` | digits only |
-| `NEXT_PUBLIC_VAPI_PUBLIC_KEY` | VAPI **public** key |
-| `NEXT_PUBLIC_VAPI_ASSISTANT_ID` | assistant id |
-
-3. **Deployments → Redeploy** the latest commit (or push an empty commit / “Redeploy”)
-
-Optional: `frontend/vercel.json` is present for framework hints; Root Directory is what actually matters.
-
-### Verify after redeploy
-
-- `https://car-wash-booking-voice-agent.vercel.app/` → landing page
-- `/book`, `/voice`, `/admin/login` load
-- Admin login talks to Render `/api/admin/me` (CORS must include the Vercel origin)
-
-## Security notes
-
+- Admin bookings list orders by `created_at` (local fix may need deploy)
+- Browser voice: enter a real mobile number before starting the call
 - Never put `SUPABASE_SERVICE_ROLE_KEY` on Vercel
-- Never commit `.env`, `frontend/.env.local`, or `deployment.env`
-- Free Render instances may cold-start after ~15 minutes idle

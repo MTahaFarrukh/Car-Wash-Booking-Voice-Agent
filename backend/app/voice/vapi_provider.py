@@ -431,12 +431,27 @@ class VapiVoiceProvider(VoiceProvider):
         for container in (
             call.get("customer") if isinstance(call.get("customer"), dict) else None,
             message.get("customer") if isinstance(message.get("customer"), dict) else None,
+            call.get("metadata") if isinstance(call.get("metadata"), dict) else None,
+            message.get("metadata") if isinstance(message.get("metadata"), dict) else None,
+            call.get("assistantOverrides") if isinstance(call.get("assistantOverrides"), dict) else None,
+            (
+                (call.get("assistantOverrides") or {}).get("variableValues")
+                if isinstance((call.get("assistantOverrides") or {}).get("variableValues"), dict)
+                else None
+            ),
             call,
             message,
         ):
             if not container:
                 continue
-            for key in ("number", "phoneNumber", "phone"):
+            for key in (
+                "number",
+                "phoneNumber",
+                "phone",
+                "customerPhone",
+                "customer_phone",
+                "callerPhone",
+            ):
                 value = container.get(key)
                 if isinstance(value, str) and value.strip():
                     return value.strip()

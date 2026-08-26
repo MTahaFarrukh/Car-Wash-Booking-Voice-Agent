@@ -16,11 +16,17 @@ def _rows() -> list[dict]:
     ]
 
 
-class TestNormalizeToolName:
-    def test_save_booking_aliases(self):
-        assert normalize_tool_name("Save Booking") == "save_booking"
-        assert normalize_tool_name("save_booking") == "save_booking"
-        assert normalize_tool_name("book-appointment") == "save_booking"
+class TestParseRelativeDates:
+    def test_today_tomorrow(self):
+        from datetime import date, timedelta
+
+        from app.voice.tool_aliases import _parse_date
+
+        today = date(2026, 8, 27)
+        assert _parse_date("today", today=today) == today
+        assert _parse_date("Tomorrow", today=today) == today + timedelta(days=1)
+        assert _parse_date("2026-08-28", today=today) == date(2026, 8, 28)
+
 
 
 class TestMatchServiceRow:

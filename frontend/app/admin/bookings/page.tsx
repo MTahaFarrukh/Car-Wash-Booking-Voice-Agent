@@ -34,7 +34,7 @@ export default function AdminBookingsPage() {
       setError(null);
       try {
         const data = await api.adminBookings({
-          limit: 200,
+          limit: 500,
         });
         if (!cancelled) setRows(data);
       } catch (err) {
@@ -57,7 +57,7 @@ export default function AdminBookingsPage() {
         status: status || undefined,
         source: source || undefined,
         booking_date: date || undefined,
-        limit: 200,
+        limit: 500,
       });
       setRows(data);
     } catch (err) {

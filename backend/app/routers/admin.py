@@ -83,7 +83,12 @@ def list_bookings_enriched(
             joinedload(Booking.vehicle),
             joinedload(Booking.service),
         )
-        .order_by(Booking.booking_date.desc(), Booking.booking_time.desc())
+        # Newest creations first so recent ops bookings aren't buried under far-future seed rows.
+        .order_by(
+            Booking.created_at.desc(),
+            Booking.booking_date.desc(),
+            Booking.booking_time.desc(),
+        )
         .limit(limit)
     )
     if booking_date is not None:

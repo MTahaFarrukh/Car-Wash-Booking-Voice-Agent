@@ -65,12 +65,25 @@ def _normalize_phone(raw: Any) -> str | None:
     return "+" + digits
 
 
-def _parse_date(raw: Any) -> date | None:
+def _parse_date(raw: Any, *, today: date | None = None) -> date | None:
     if raw is None:
         return None
     if isinstance(raw, date) and not isinstance(raw, datetime):
         return raw
     text = str(raw).strip()
+    if not text:
+        return None
+
+    # Spoken relative dates from voice callers / VAPI tools.
+    anchor = today or date.today()
+    lowered = re.sub(r"\s+", " ", text.lower().strip(" .,!"))
+    if lowered in {"today", "todays", "to-day"}:
+        return anchor
+    if lowered in {"tomorrow", "tmr", "tmrw", "tommorow", "tomorow"}:
+        from datetime import timedelta
+
+        return anchor + timedelta(days=1)
+
     for fmt in ("%Y-%m-%d", "%d %B %Y", "%d %b %Y", "%B %d %Y", "%m/%d/%Y", "%d/%m/%Y"):
         try:
             return datetime.strptime(text, fmt).date()
@@ -88,6 +101,11 @@ def _parse_time(raw: Any) -> time | None:
     if isinstance(raw, time):
         return raw
     text = str(raw).strip().upper().replace(".", "")
+    # Spoken "5" / "17" → HH:00 when unambiguous.
+    if re.fullmatch(r"\d{1,2}", text):
+        hour = int(text)
+        if 0 <= hour <= 23:
+            return time(hour=hour, minute=0)
     for fmt in ("%H:%M:%S", "%H:%M", "%I:%M %p", "%I %p", "%I:%M%p", "%I%p"):
         try:
             return datetime.strptime(text, fmt).time().replace(second=0, microsecond=0)

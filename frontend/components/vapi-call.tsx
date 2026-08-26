@@ -29,6 +29,7 @@ export function VapiCallPanel() {
   const [error, setError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string>("");
   const [seconds, setSeconds] = useState(0);
+  const [phone, setPhone] = useState("");
 
   useEffect(() => {
     if (state !== "active" && state !== "connecting") return;
@@ -89,7 +90,20 @@ export function VapiCallPanel() {
         setState("error");
       });
 
-      await vapi.start(assistantId);
+      await vapi.start(assistantId, {
+        // Browser calls have no PSTN caller ID — pass phone so Save Booking can succeed.
+        ...(phone.trim()
+          ? {
+              variableValues: {
+                customerPhone: phone.trim(),
+                phone: phone.trim(),
+              },
+              metadata: {
+                customerPhone: phone.trim(),
+              },
+            }
+          : {}),
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start the VAPI call.");
       setState("error");
@@ -125,6 +139,18 @@ export function VapiCallPanel() {
       <p className="mt-2 text-sm text-muted-foreground">
         Speak naturally — bookings still go through Sparkle&apos;s backend tools.
       </p>
+
+      <label className="mt-6 w-full max-w-sm text-left text-sm">
+        <span className="text-muted-foreground">Your mobile (with country code)</span>
+        <input
+          type="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="+923001234567"
+          disabled={state === "connecting" || state === "active"}
+          className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 outline-none focus:border-teal-600 disabled:opacity-60"
+        />
+      </label>
 
       {!configured && (
         <p className="mt-6 rounded-xl bg-foam px-4 py-3 text-sm text-muted-foreground">

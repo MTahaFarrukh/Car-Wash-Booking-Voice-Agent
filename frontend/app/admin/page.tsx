@@ -29,7 +29,7 @@ export default function AdminDashboardPage() {
       setError(null);
       try {
         const [b, c, w, cust, veh] = await Promise.all([
-          api.adminBookings({ limit: 200 }),
+          api.adminBookings({ limit: 500 }),
           api.adminCallLogs({ limit: 50 }),
           api.adminWhatsAppActivity(50),
           api.listCustomers({ limit: 500 }),
@@ -52,7 +52,13 @@ export default function AdminDashboardPage() {
     };
   }, []);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = (() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  })();
   const stats = useMemo(() => {
     const todayBookings = bookings.filter((b) => b.booking_date === today).length;
     const upcoming = bookings.filter((b) => b.booking_date >= today && b.status !== "cancelled").length;
