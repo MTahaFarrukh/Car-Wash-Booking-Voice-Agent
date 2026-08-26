@@ -36,6 +36,7 @@ export function AdminSidebar({ pathname }: { pathname: string }) {
   async function onLogout() {
     await signOut();
     router.replace("/admin/login");
+    router.refresh();
   }
 
   return (

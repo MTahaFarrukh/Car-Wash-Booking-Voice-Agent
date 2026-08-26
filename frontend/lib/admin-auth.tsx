@@ -56,13 +56,22 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     if (!supabaseConfigured) {
       return { error: "Supabase is not configured (check NEXT_PUBLIC_SUPABASE_*)." };
     }
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      return { error: error.message };
+    }
+    if (!data.session || !data.user) {
+      return { error: "Sign-in succeeded but no session was returned. Try again." };
+    }
+    setSession(data.session);
+    setLoading(false);
+    return { error: null };
   }, []);
 
   const signOut = useCallback(async () => {
     if (!supabaseConfigured) return;
     await supabase.auth.signOut();
+    setSession(null);
   }, []);
 
   const value = useMemo<AdminAuthContextValue>(

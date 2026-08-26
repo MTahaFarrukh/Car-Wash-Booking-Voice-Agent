@@ -15,6 +15,7 @@ export default function AdminLoginPage() {
   useEffect(() => {
     if (!loading && session) {
       router.replace("/admin");
+      router.refresh();
     }
   }, [loading, session, router]);
 
@@ -29,6 +30,7 @@ export default function AdminLoginPage() {
         return;
       }
       router.replace("/admin");
+      router.refresh();
     } finally {
       setSubmitting(false);
     }
@@ -43,7 +45,11 @@ export default function AdminLoginPage() {
   }
 
   if (session) {
-    return null;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-foam text-sm text-muted-foreground">
+        Signed in — opening dashboard…
+      </div>
+    );
   }
 
   return (
