@@ -1,82 +1,112 @@
-# Phase 10A — deployment preparation (DO NOT treat as “deployed”)
-#
-# Last touched: 2026-08-25 (docs-only streak keep-alive)
-#
-# Intended production shape:
-#   Frontend  → Vercel (Next.js)
-#   Backend   → Render (FastAPI)
-#   Database  → Supabase Postgres
-#   Voice     → VAPI
-#   LLM       → Gemini
-#   WhatsApp  → Baileys bridge (hosting TBD — see below)
+# Phase 10B — FastAPI on Render
 
-## FastAPI on Render (ready, not deployed)
+Last touched: 2026-08-26
 
-Suggested service settings:
+Intended production shape:
 
-- Root directory: `backend`
-- Runtime: Python 3
-- Build: `pip install -r requirements.txt`
-- Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-- Health check path: `/health`
-- Release / pre-deploy: `alembic upgrade head`
+- Frontend → Vercel (Next.js) — not this step
+- Backend → Render (FastAPI) — **this step**
+- Database / Auth → Supabase
+- Voice → VAPI
+- LLM → Gemini
+- WhatsApp → always-on Baileys host (not this step)
 
-Blueprint sketch: [`render.yaml`](render.yaml)
+## Deploy status (2026-08-26)
 
-Required env on Render (private):
+Prepared and attempted CLI deploy of service `sparkle-api` from
+`https://github.com/MTahaFarrukh/Car-Wash-Booking-Voice-Agent.git` (`main`, `rootDir: backend`).
 
-- `DATABASE_URL`
-- `SUPABASE_URL`, `SUPABASE_ANON_KEY` (token verification)
-- `SUPABASE_SERVICE_ROLE_KEY` (optional; not required for admin JWT verify)
-- `CORS_ORIGINS` and/or `FRONTEND_URL` (production Vercel URL)
-- `ENVIRONMENT=production`
-- WhatsApp / VAPI / Gemini secrets as today
+**Blocked by Render billing:** API returned `402 Payment information is required`.
+Add a payment method at https://dashboard.render.com/billing , then re-run create/deploy
+(or ask the agent to retry). Until `/health` succeeds on the live HTTPS URL, this is
+**not** considered deployed.
 
-Admin bootstrap after first deploy:
+Local pre-checks (passed):
+
+- `pytest -q` → 164 passed, 1 skipped
+- `/health` is public (no auth)
+- Admin routes remain Bearer + `admin_users`
+- `DATABASE_URL` points at Supabase pooler (`sslmode` set)
+- No `.env` committed; service-role not used by frontend
+
+## Render service settings
+
+| Setting | Value |
+|--------|--------|
+| Service name | `sparkle-api` |
+| Root directory | `backend` |
+| Runtime | Python 3 (`PYTHON_VERSION=3.12.0` in blueprint) |
+| Build | `pip install -r requirements.txt` |
+| Pre-deploy / release | `alembic upgrade head` |
+| Start | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+| Health check | `/health` |
+| Plan | free (when billing allows) |
+| Blueprint | [`render.yaml`](render.yaml) |
+
+## Environment variables (Render Dashboard — secrets never in git)
+
+### Required for a healthy API
+
+| Variable | Notes |
+|----------|--------|
+| `DATABASE_URL` | Supabase Postgres (prefer pooler + `sslmode=require`) |
+| `SUPABASE_URL` | Project URL |
+| `SUPABASE_ANON_KEY` | Anon key — used to verify admin JWTs |
+| `ENVIRONMENT` | `production` |
+| `CORS_ORIGINS` | Comma-separated production frontend origins (**no `*`**) |
+| `FRONTEND_URL` | Optional; merged into CORS (set to Vercel URL when ready) |
+
+### LLM / WhatsApp / Voice (existing app config)
+
+| Variable | Suggested production value |
+|----------|----------------------------|
+| `LLM_PROVIDER` | `gemini` |
+| `GEMINI_API_KEY` | secret |
+| `GEMINI_MODEL` | match local (currently `gemini-3.6-flash` in repo defaults) |
+| `WHATSAPP_AGENT_MODE` | `auto` |
+| `WHATSAPP_BRIDGE_SECRET` | shared with Baileys bridge |
+| `VOICE_PROVIDER` | `vapi` |
+| `VOICE_WEBHOOK_SECRET` | secret |
+| `VAPI_API_KEY` | secret |
+| `VAPI_ASSISTANT_ID` | assistant UUID |
+| `VAPI_WEBHOOK_SECRET` | secret |
+
+### Optional / not required for admin JWT verify
+
+| Variable | Notes |
+|----------|--------|
+| `SUPABASE_SERVICE_ROLE_KEY` | Backend-only if ever needed; **never** put on Vercel / frontend |
+
+Do **not** set `CORS_ORIGINS=*`.
+
+Until Vercel exists, leave `CORS_ORIGINS` / `FRONTEND_URL` empty (or set only known HTTPS origins). Browser admin against the API will need the real frontend origin later.
+
+## Post-deploy verification checklist
+
+Once the service is live:
+
+1. `GET https://<service>.onrender.com/health` → 200
+2. `GET https://<service>.onrender.com/docs` → 200
+3. `GET https://<service>.onrender.com/health/db` → `{"status":"ok","database":"connected"}`
+4. `GET /api/admin/me` without token → 401
+5. `GET /api/admin/me` with non-admin Bearer → 403
+6. `GET /api/admin/me` with seeded admin Bearer → 200
+
+Free instances spin down after ~15 minutes idle (cold start ~30–60s).
+
+## Admin bootstrap (if not already done on Supabase)
 
 1. Create email/password user in Supabase Auth.
-2. Run: `python -m scripts.seed_admin --email … --auth-user-id …`
+2. From a machine with `DATABASE_URL`:  
+   `python -m scripts.seed_admin --email … --auth-user-id …`
 
-## Frontend on Vercel
+## Baileys (unchanged — not deploying now)
 
-- Root: `frontend`
-- Env: all `NEXT_PUBLIC_*` including Supabase URL + **anon** key
-- Never set `SUPABASE_SERVICE_ROLE_KEY` on Vercel
+Prefer a separate always-on host with durable `auth_info`. Do not use Render free web sleep for Baileys.
 
-## Baileys WhatsApp bridge — audit findings
+## Security notes
 
-Code reality (`whatsapp-bridge/`):
-
-- Auth via `useMultiFileAuthState` → default dir `auth_info/` (or `WHATSAPP_SESSION_PATH`)
-- Creds saved on `creds.update`
-- Reconnects in-process unless `loggedOut` (then QR again)
-- Long-lived Node process; **no HTTP server / no PORT**
-- Session **survives process restart only if the auth directory survives**
-
-### A. Render backend + Render Baileys web service
-
-| Factor | Fit |
-|--------|-----|
-| Ephemeral disk (free) | Poor — `auth_info` lost → re-QR |
-| Sleep when idle | Poor — WhatsApp disconnects; misses messages |
-| Persistent disk (paid) | Possible if always-on + disk mounted at session path |
-| Process model | Mismatch — bridge is not an HTTP app |
-
-### B. Render backend + separate persistent Baileys host
-
-Matches the code: always-on VM/VPS (or Render **Background Worker** + persistent disk) with durable `auth_info`.
-
-### C. Other low-cost options
-
-Small always-on VPS (Hetzner/DigitalOcean/Oracle free tier), or home/office machine with tunnel — only if you accept ops burden.
-
-### Recommendation (not a final decision)
-
-Prefer **B**: keep FastAPI on Render; run Baileys as a **single always-on process with durable disk**. Do not use Render free web sleep for Baileys. Revisit after you pick budget (worker+disk vs cheap VPS).
-
-## Security notes (Phase 10A)
-
-- `/api/admin/*` requires Supabase Bearer + `admin_users` row
+- `/api/admin/*` requires Supabase Bearer + active `admin_users` row
 - Public booking / services / availability remain open
-- CORS is origin-list based (no `*` in production config)
-- Service role key must stay server-only
+- CORS is origin-list based
+- Service role key stays server-only
