@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AdminSidebar } from "@/components/admin/sidebar";
+import { AdminNotificationsBell } from "@/components/admin/notifications-bell";
 import { AdminAuthProvider, useAdminAuth } from "@/lib/admin-auth";
+import { AdminNotificationsProvider } from "@/lib/admin-notifications";
 import { ApiError, api } from "@/lib/api";
 
 type Probe =
@@ -119,18 +121,23 @@ function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-foam">
-      <AdminSidebar pathname={pathname} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-border bg-white px-6 py-4">
-          <p className="text-sm text-muted-foreground">Sparkle Car Wash · Admin</p>
+    <AdminNotificationsProvider>
+      <div className="flex min-h-screen bg-foam">
+        <AdminSidebar pathname={pathname} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="flex items-center justify-between border-b border-border bg-white px-6 py-4">
+            <p className="text-sm text-muted-foreground">Sparkle Car Wash · Admin</p>
+            <AdminNotificationsBell />
+          </header>
           {!configured && (
-            <p className="mt-1 text-xs text-amber-700">Supabase env vars missing — login will not work.</p>
+            <p className="border-b border-border bg-amber-50 px-6 py-2 text-xs text-amber-700">
+              Supabase env vars missing — login will not work.
+            </p>
           )}
-        </header>
-        <div className="flex-1 overflow-auto p-6">{children}</div>
+          <div className="flex-1 overflow-auto p-6">{children}</div>
+        </div>
       </div>
-    </div>
+    </AdminNotificationsProvider>
   );
 }
 

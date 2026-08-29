@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date, time, timedelta
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from app.main import app
 from app.models.admin_user import AdminUser
+from app.models.booking import Booking, BookingSource, BookingStatus
 from app.models.call_log import CallLog, CallOutcome
 from app.models.customer import Customer
+from app.models.service import Service
+from app.models.vehicle import Vehicle
 from app.models.whatsapp_message import WhatsAppProcessedMessage
 from tests.conftest import requires_database
 
@@ -94,5 +99,55 @@ class TestAdminApis:
             resp = client.get("/api/admin/bookings", params={"limit": 5}, headers=headers)
             assert resp.status_code == 200
             assert isinstance(resp.json(), list)
+        finally:
+            getattr(_auth_headers, "_patcher", None) and _auth_headers._patcher.stop()  # type: ignore[attr-defined]
+
+    def test_admin_notifications_and_acknowledge(self, db_session):
+        headers = _auth_headers(db_session)
+        try:
+            phone = f"+9298{uuid.uuid4().int % 10_000_000:08d}"
+            customer = Customer(name="Notify Test", phone=phone)
+            db_session.add(customer)
+            db_session.flush()
+            service = db_session.scalars(select(Service).limit(1)).first()
+            assert service is not None
+            vehicle = Vehicle(
+                customer_id=customer.id,
+                vehicle_type="car",
+                make="Honda",
+                model="City",
+                registration_number="TEST-1",
+            )
+            db_session.add(vehicle)
+            db_session.flush()
+            booking = Booking(
+                customer_id=customer.id,
+                vehicle_id=vehicle.id,
+                service_id=service.id,
+                booking_date=date.today() + timedelta(days=2),
+                booking_time=time(10, 0),
+                status=BookingStatus.PENDING,
+                source=BookingSource.VOICE,
+                admin_acknowledged_at=None,
+            )
+            db_session.add(booking)
+            db_session.commit()
+
+            count_before = client.get("/api/admin/notifications/count", headers=headers)
+            assert count_before.status_code == 200
+            assert count_before.json()["count"] >= 1
+
+            listed = client.get("/api/admin/notifications", headers=headers)
+            assert listed.status_code == 200
+            assert any(row["id"] == str(booking.id) for row in listed.json())
+
+            ack = client.post(f"/api/admin/bookings/{booking.id}/acknowledge", headers=headers)
+            assert ack.status_code == 200
+            body = ack.json()
+            assert body["status"] == "confirmed"
+            assert body["admin_acknowledged_at"] is not None
+
+            count_after = client.get("/api/admin/notifications/count", headers=headers)
+            assert count_after.json()["count"] == count_before.json()["count"] - 1
         finally:
             getattr(_auth_headers, "_patcher", None) and _auth_headers._patcher.stop()  # type: ignore[attr-defined]

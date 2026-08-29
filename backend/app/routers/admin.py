@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import date
+import uuid
+from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, text
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
@@ -18,6 +19,8 @@ from app.models.call_log import CallLog, CallOutcome
 from app.models.customer import Customer
 from app.models.whatsapp_message import WhatsAppProcessedMessage
 from app.schemas.admin import (
+    AcknowledgeBookingResponse,
+    AdminNotificationCount,
     AdminStatusResponse,
     BookingListItem,
     CallLogResponse,
@@ -47,6 +50,7 @@ def _booking_list_item(booking: Booking) -> BookingListItem:
         status=booking.status,
         source=booking.source,
         notes=booking.notes,
+        admin_acknowledged_at=booking.admin_acknowledged_at,
         created_at=booking.created_at,
         updated_at=booking.updated_at,
         customer_name=booking.customer.name if booking.customer else None,
@@ -104,6 +108,81 @@ def list_bookings_enriched(
         )
     rows = db.scalars(stmt).unique().all()
     return [_booking_list_item(row) for row in rows]
+
+
+def _unacknowledged_stmt(limit: int | None = None):
+    stmt = (
+        select(Booking)
+        .options(
+            joinedload(Booking.customer),
+            joinedload(Booking.vehicle),
+            joinedload(Booking.service),
+        )
+        .where(
+            Booking.admin_acknowledged_at.is_(None),
+            Booking.status != BookingStatus.CANCELLED,
+        )
+        .order_by(Booking.created_at.desc())
+    )
+    if limit is not None:
+        stmt = stmt.limit(limit)
+    return stmt
+
+
+@router.get("/notifications/count", response_model=AdminNotificationCount)
+def unacknowledged_notification_count(db: Session = Depends(get_db)) -> AdminNotificationCount:
+    count = db.scalar(
+        select(func.count())
+        .select_from(Booking)
+        .where(
+            Booking.admin_acknowledged_at.is_(None),
+            Booking.status != BookingStatus.CANCELLED,
+        )
+    )
+    return AdminNotificationCount(count=int(count or 0))
+
+
+@router.get("/notifications", response_model=list[BookingListItem])
+def list_unacknowledged_notifications(
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> list[BookingListItem]:
+    rows = db.scalars(_unacknowledged_stmt(limit)).unique().all()
+    return [_booking_list_item(row) for row in rows]
+
+
+@router.post("/bookings/{booking_id}/acknowledge", response_model=AcknowledgeBookingResponse)
+def acknowledge_booking(
+    booking_id: uuid.UUID,
+    db: Session = Depends(get_db),
+) -> AcknowledgeBookingResponse:
+    booking = db.scalar(
+        select(Booking)
+        .options(joinedload(Booking.customer), joinedload(Booking.vehicle), joinedload(Booking.service))
+        .where(Booking.id == booking_id)
+    )
+    if booking is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    if booking.status == BookingStatus.CANCELLED:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancelled booking cannot be accepted")
+    if booking.admin_acknowledged_at is not None:
+        return AcknowledgeBookingResponse(
+            id=booking.id,
+            status=booking.status,
+            admin_acknowledged_at=booking.admin_acknowledged_at,
+        )
+
+    now = datetime.now(timezone.utc)
+    booking.admin_acknowledged_at = now
+    if booking.status == BookingStatus.PENDING:
+        booking.status = BookingStatus.CONFIRMED
+    db.commit()
+    db.refresh(booking)
+    return AcknowledgeBookingResponse(
+        id=booking.id,
+        status=booking.status,
+        admin_acknowledged_at=booking.admin_acknowledged_at,
+    )
 
 
 @router.get("/call-logs", response_model=list[CallLogResponse])

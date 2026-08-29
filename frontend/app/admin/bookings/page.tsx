@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ApiError, api } from "@/lib/api";
+import { useAdminNotifications } from "@/lib/admin-notifications";
 import type { BookingListItem, BookingSource, BookingStatus } from "@/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,7 @@ function SourceBadge({ source }: { source: BookingSource }) {
 }
 
 export default function AdminBookingsPage() {
+  const { acknowledge, busyId: ackBusyId, refresh: refreshNotifications } = useAdminNotifications();
   const [rows, setRows] = useState<BookingListItem[]>([]);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<BookingStatus | "">("");
@@ -66,6 +68,19 @@ export default function AdminBookingsPage() {
       setLoading(false);
     }
   }
+  async function accept(id: string) {
+    setBusyId(id);
+    try {
+      await acknowledge(id);
+      await load();
+      await refreshNotifications();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Accept failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function cancel(id: string) {
     setBusyId(id);
     try {
@@ -139,8 +154,13 @@ export default function AdminBookingsPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr key={row.id} className="border-b last:border-0">
+            {rows.map((row) => {
+              const needsReview = !row.admin_acknowledged_at && row.status !== "cancelled";
+              return (
+              <tr
+                key={row.id}
+                className={cn("border-b last:border-0", needsReview && "bg-amber-50/80")}
+              >
                 <td className="px-3 py-2">
                   <div className="font-medium">{row.customer_name ?? "—"}</div>
                   <div className="text-xs text-muted-foreground">{row.customer_phone}</div>
@@ -155,19 +175,31 @@ export default function AdminBookingsPage() {
                   <SourceBadge source={row.source} />
                 </td>
                 <td className="px-3 py-2">
-                  {row.status !== "cancelled" && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={busyId === row.id}
-                      onClick={() => void cancel(row.id)}
-                    >
-                      Cancel
-                    </Button>
-                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {needsReview && (
+                      <Button
+                        size="sm"
+                        disabled={busyId === row.id || ackBusyId === row.id}
+                        onClick={() => void accept(row.id)}
+                      >
+                        Accept
+                      </Button>
+                    )}
+                    {row.status !== "cancelled" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busyId === row.id}
+                        onClick={() => void cancel(row.id)}
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>

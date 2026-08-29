@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminAuth } from "@/lib/admin-auth";
+import { useAdminNotifications } from "@/lib/admin-notifications";
+import { AdminNavNotificationDot } from "@/components/admin/notifications-bell";
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -31,6 +33,7 @@ const NAV = [
 
 export function AdminSidebar({ pathname }: { pathname: string }) {
   const { user, signOut } = useAdminAuth();
+  const { count } = useAdminNotifications();
   const router = useRouter();
 
   async function onLogout() {
@@ -65,6 +68,7 @@ export function AdminSidebar({ pathname }: { pathname: string }) {
             >
               <Icon className="size-4" />
               {item.label}
+              {item.href === "/admin/bookings" && <AdminNavNotificationDot show={count > 0} />}
             </Link>
           );
         })}

@@ -63,6 +63,7 @@ export interface Booking {
   status: BookingStatus;
   source: BookingSource;
   notes: string | null;
+  admin_acknowledged_at?: string | null;
   created_at: string;
   updated_at: string;
 }

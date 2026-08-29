@@ -205,6 +205,18 @@ export const api = {
     limit?: number;
   }) => request<BookingListItem[]>(`/api/admin/bookings${qs(params ?? {})}`),
 
+  adminNotificationCount: () =>
+    request<{ count: number }>("/api/admin/notifications/count"),
+
+  adminNotifications: (limit = 20) =>
+    request<BookingListItem[]>(`/api/admin/notifications${qs({ limit })}`),
+
+  acknowledgeBooking: (id: string) =>
+    request<{ id: string; status: BookingStatus; admin_acknowledged_at: string }>(
+      `/api/admin/bookings/${id}/acknowledge`,
+      { method: "POST" },
+    ),
+
   adminCallLogs: (params?: { outcome?: CallOutcome; provider?: string; limit?: number }) =>
     request<CallLog[]>(`/api/admin/call-logs${qs(params ?? {})}`),
 

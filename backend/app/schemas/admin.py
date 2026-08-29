@@ -61,9 +61,20 @@ class BookingListItem(BaseModel):
     status: BookingStatus
     source: BookingSource
     notes: str | None
+    admin_acknowledged_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
     customer_name: str | None = None
     customer_phone: str | None = None
     vehicle_label: str | None = None
     service_name: str | None = None
+
+
+class AdminNotificationCount(BaseModel):
+    count: int
+
+
+class AcknowledgeBookingResponse(BaseModel):
+    id: uuid.UUID
+    status: BookingStatus
+    admin_acknowledged_at: datetime
