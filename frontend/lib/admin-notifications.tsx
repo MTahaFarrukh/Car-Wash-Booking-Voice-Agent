@@ -16,6 +16,7 @@ type AdminNotificationsContextValue = {
   count: number;
   items: BookingListItem[];
   loading: boolean;
+  error: string | null;
   refresh: () => Promise<void>;
   acknowledge: (bookingId: string) => Promise<void>;
   busyId: string | null;
@@ -30,6 +31,7 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
   const [items, setItems] = useState<BookingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -39,10 +41,15 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
       ]);
       setCount(countRes.count);
       setItems(list);
+      setError(null);
     } catch (err) {
-      if (!(err instanceof ApiError && (err.status === 401 || err.status === 403))) {
-        console.error("admin notifications refresh failed", err);
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        return;
       }
+      const message =
+        err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Could not load notifications";
+      setError(message);
+      console.error("admin notifications refresh failed", err);
     } finally {
       setLoading(false);
     }
@@ -68,8 +75,8 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
   );
 
   const value = useMemo(
-    () => ({ count, items, loading, refresh, acknowledge, busyId }),
-    [count, items, loading, refresh, acknowledge, busyId],
+    () => ({ count, items, loading, error, refresh, acknowledge, busyId }),
+    [count, items, loading, error, refresh, acknowledge, busyId],
   );
 
   return (

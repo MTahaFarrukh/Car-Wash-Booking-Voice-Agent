@@ -68,7 +68,9 @@ export function AdminSidebar({ pathname }: { pathname: string }) {
             >
               <Icon className="size-4" />
               {item.label}
-              {item.href === "/admin/bookings" && <AdminNavNotificationDot show={count > 0} />}
+              {item.href === "/admin/bookings" && (
+                <AdminNavNotificationDot show={count > 0} count={count} />
+              )}
             </Link>
           );
         })}

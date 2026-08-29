@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { sourceChannelLabel, useAdminNotifications } from "@/lib/admin-notifications";
 
 export function AdminNotificationsBell() {
-  const { count, items, loading, acknowledge, busyId } = useAdminNotifications();
+  const { count, items, loading, error, acknowledge, busyId } = useAdminNotifications();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -44,8 +44,15 @@ export function AdminNotificationsBell() {
           <div className="border-b px-4 py-3">
             <p className="font-display text-sm font-semibold text-ink">New appointments</p>
             <p className="text-xs text-muted-foreground">
-              {loading ? "Checking…" : count === 0 ? "You're all caught up." : `${count} need review`}
+              {loading
+                ? "Checking…"
+                : error
+                  ? "Could not load notifications"
+                  : count === 0
+                    ? "You're all caught up."
+                    : `${count} need review`}
             </p>
+            {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
           </div>
           <ul className="max-h-80 overflow-y-auto">
             {items.length === 0 && !loading && (
@@ -70,9 +77,13 @@ export function AdminNotificationsBell() {
                   >
                     Accept
                   </Button>
-                  <Button size="sm" variant="outline" asChild onClick={() => setOpen(false)}>
-                    <Link href="/admin/bookings">View</Link>
-                  </Button>
+                  <Link
+                    href="/admin/bookings"
+                    onClick={() => setOpen(false)}
+                    className={buttonVariants({ size: "sm", variant: "outline" })}
+                  >
+                    View
+                  </Link>
                 </div>
               </li>
             ))}
@@ -83,11 +94,18 @@ export function AdminNotificationsBell() {
   );
 }
 
-export function AdminNavNotificationDot({ show }: { show: boolean }) {
+export function AdminNavNotificationDot({ show, count }: { show: boolean; count?: number }) {
   if (!show) return null;
+  if (count != null && count > 0) {
+    return (
+      <span className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white ring-2 ring-sidebar">
+        {count > 9 ? "9+" : count}
+      </span>
+    );
+  }
   return (
     <span
-      className={cn("ml-auto size-2 shrink-0 rounded-full bg-red-500")}
+      className={cn("ml-auto size-2.5 shrink-0 rounded-full bg-red-500 ring-2 ring-sidebar")}
       aria-hidden
     />
   );
