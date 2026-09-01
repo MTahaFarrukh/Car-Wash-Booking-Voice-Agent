@@ -98,6 +98,8 @@
     font-family: var(--font-manrope), system-ui, sans-serif;
     font-feature-settings: "kern" 1, "liga" 1;
   }
+  html { scroll-behavior: smooth; }
+  ::selection { background: rgba(46, 196, 182, 0.28); color: var(--warm-white); }
   h1,
   h2,
   h3,
@@ -214,4 +216,34 @@
   background: linear-gradient(90deg, var(--muted) 25%, var(--secondary) 50%, var(--muted) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.hero-reflection {
+  position: absolute;
+  width: min(70vw, 920px);
+  height: 640px;
+  right: -18%;
+  top: 5%;
+  transform: rotate(-18deg);
+  background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.025) 48%, rgba(46,196,182,.055) 52%, transparent 66%);
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+.voice-preview-orb {
+  display: flex;
+  width: 116px;
+  height: 116px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(46, 196, 182, .28);
+  border-radius: 999px;
+  background: radial-gradient(circle at 45% 38%, rgba(46,196,182,.22), rgba(6,16,18,.96) 58%);
+  box-shadow: 0 0 0 18px rgba(46,196,182,.025), 0 0 90px rgba(46,196,182,.18), inset 0 0 30px rgba(46,196,182,.08);
+  animation: orb-breathe 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .voice-preview-orb { animation: none; }
 }
