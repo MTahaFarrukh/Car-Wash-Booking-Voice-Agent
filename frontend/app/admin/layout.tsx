@@ -125,8 +125,11 @@ function AdminShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen bg-foam">
         <AdminSidebar pathname={pathname} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex items-center justify-between border-b border-border bg-white px-6 py-4">
-            <p className="text-sm text-muted-foreground">Sparkle Car Wash · Admin</p>
+          <header className="flex items-center justify-between border-b border-border bg-white/90 px-6 py-4 backdrop-blur-sm">
+            <div>
+              <p className="font-display text-lg font-bold text-ink">Sparkle Car Wash</p>
+              <p className="text-xs text-muted-foreground">Operations dashboard</p>
+            </div>
             <AdminNotificationsBell />
           </header>
           {!configured && (

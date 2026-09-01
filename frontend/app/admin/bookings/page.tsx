@@ -4,18 +4,16 @@ import { useEffect, useState } from "react";
 import { ApiError, api } from "@/lib/api";
 import { useAdminNotifications } from "@/lib/admin-notifications";
 import type { BookingListItem, BookingSource, BookingStatus } from "@/types";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 function SourceBadge({ source }: { source: BookingSource }) {
-  const label = source === "dashboard" ? "WEB" : source === "voice" ? "VOICE" : "WHATSAPP";
-  const styles =
-    source === "voice"
-      ? "bg-teal-100 text-teal-900"
-      : source === "whatsapp"
-        ? "bg-emerald-100 text-emerald-900"
-        : "bg-sky-100 text-sky-900";
-  return <span className={cn("rounded-md px-2 py-0.5 text-xs font-semibold", styles)}>{label}</span>;
+  const label = source === "dashboard" ? "Web" : source === "voice" ? "Voice" : "WhatsApp";
+  const variant = source === "voice" ? "voice" : source === "whatsapp" ? "whatsapp" : "web";
+  return <Badge variant={variant}>{label}</Badge>;
 }
 
 export default function AdminBookingsPage() {
@@ -94,28 +92,28 @@ export default function AdminBookingsPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
-        <h1 className="font-display text-2xl font-bold">Bookings</h1>
-        <p className="text-sm text-muted-foreground">All channels — web, voice, WhatsApp.</p>
+        <h1 className="font-display text-3xl font-bold text-ink">Bookings</h1>
+        <p className="mt-1 text-muted-foreground">All channels — web, voice, and WhatsApp.</p>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <input
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="font-display text-lg">Filters</CardTitle>
+          <CardDescription>Search and narrow the list</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+        <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search name or phone"
-          className="rounded-lg border border-input px-3 py-2 text-sm"
+          className="max-w-xs"
         />
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="rounded-lg border border-input px-3 py-2 text-sm"
-        />
+        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="max-w-[11rem]" />
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value as BookingStatus | "")}
-          className="rounded-lg border border-input px-3 py-2 text-sm"
+          className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
         >
           <option value="">All statuses</option>
           <option value="pending">Pending</option>
@@ -126,7 +124,7 @@ export default function AdminBookingsPage() {
         <select
           value={source}
           onChange={(e) => setSource(e.target.value as BookingSource | "")}
-          className="rounded-lg border border-input px-3 py-2 text-sm"
+          className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
         >
           <option value="">All sources</option>
           <option value="dashboard">Web</option>
@@ -134,15 +132,16 @@ export default function AdminBookingsPage() {
           <option value="whatsapp">WhatsApp</option>
         </select>
         <Button onClick={() => void load()}>Apply</Button>
-      </div>
+        </CardContent>
+      </Card>
       {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
       {error && <p className="text-sm text-destructive">{error}</p>}
       {!loading && rows.length === 0 && (
         <p className="text-sm text-muted-foreground">No bookings match these filters.</p>
       )}
-      <div className="overflow-x-auto rounded-xl border border-border bg-white">
+      <div className="overflow-x-auto rounded-2xl border border-border bg-white shadow-sm">
         <table className="min-w-full text-left text-sm">
-          <thead className="border-b bg-foam text-xs uppercase text-muted-foreground">
+          <thead className="border-b bg-foam/80 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             <tr>
               <th className="px-3 py-2">Customer</th>
               <th className="px-3 py-2">Vehicle</th>

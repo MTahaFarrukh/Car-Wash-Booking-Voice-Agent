@@ -2,7 +2,9 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export function SiteHeader({ className }: { className?: string }) {
+export function SiteHeader({ className, variant = "dark" }: { className?: string; variant?: "dark" | "light" }) {
+  const isLight = variant === "light";
+
   return (
     <header
       className={cn(
@@ -10,13 +12,24 @@ export function SiteHeader({ className }: { className?: string }) {
         className,
       )}
     >
-      <Link href="/" className="font-display text-xl font-extrabold tracking-tight text-white md:text-2xl">
+      <Link
+        href="/"
+        className={cn(
+          "font-display text-xl font-extrabold tracking-tight md:text-2xl",
+          isLight ? "text-ink" : "text-white",
+        )}
+      >
         Sparkle
       </Link>
       <nav className="flex items-center gap-2">
         <Link
           href="/book"
-          className={cn(buttonVariants({ variant: "ghost" }), "text-white/90 hover:bg-white/10 hover:text-white")}
+          className={cn(
+            buttonVariants({ variant: "ghost" }),
+            isLight
+              ? "text-muted-foreground hover:bg-secondary hover:text-ink"
+              : "text-white/90 hover:bg-white/10 hover:text-white",
+          )}
         >
           Book
         </Link>
@@ -24,7 +37,10 @@ export function SiteHeader({ className }: { className?: string }) {
           href="/voice"
           className={cn(
             buttonVariants({ variant: "ghost" }),
-            "hidden text-white/90 hover:bg-white/10 hover:text-white sm:inline-flex",
+            "hidden sm:inline-flex",
+            isLight
+              ? "text-muted-foreground hover:bg-secondary hover:text-ink"
+              : "text-white/90 hover:bg-white/10 hover:text-white",
           )}
         >
           Voice AI

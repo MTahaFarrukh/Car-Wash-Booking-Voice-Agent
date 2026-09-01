@@ -2,12 +2,24 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Calendar, Car, CheckCircle2, Clock, Sparkles, User } from "lucide-react";
 import { ApiError, api } from "@/lib/api";
 import type { Service } from "@/types";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
+
+const STEPS = [
+  { n: 1, label: "Service", icon: Sparkles },
+  { n: 2, label: "Date", icon: Calendar },
+  { n: 3, label: "Time", icon: Clock },
+  { n: 4, label: "You", icon: User },
+  { n: 5, label: "Vehicle", icon: Car },
+  { n: 6, label: "Confirm", icon: CheckCircle2 },
+] as const;
 
 function todayIso() {
   const d = new Date();
@@ -18,6 +30,65 @@ function normalizePhone(raw: string) {
   const digits = raw.replace(/\D/g, "");
   if (!digits) return "";
   return raw.trim().startsWith("+") ? `+${digits}` : `+${digits}`;
+}
+
+function formatPrice(value: string | number) {
+  const num = typeof value === "number" ? value : Number.parseFloat(String(value));
+  if (Number.isNaN(num)) return String(value);
+  return new Intl.NumberFormat("en-PK", { style: "currency", currency: "PKR", maximumFractionDigits: 0 }).format(num);
+}
+
+function BookingStepper({ step }: { step: Step }) {
+  return (
+    <div className="mb-8">
+      <div className="flex items-center justify-between gap-1">
+        {STEPS.map((s, i) => {
+          const Icon = s.icon;
+          const done = step > s.n;
+          const active = step === s.n;
+          return (
+            <div key={s.n} className="flex flex-1 items-center">
+              <div className="flex flex-col items-center gap-1.5">
+                <div
+                  className={cn(
+                    "flex size-9 items-center justify-center rounded-full border-2 text-xs font-bold transition-all",
+                    done && "border-aqua bg-aqua text-ink",
+                    active && !done && "border-primary bg-primary text-primary-foreground shadow-md",
+                    !done && !active && "border-border bg-white text-muted-foreground",
+                  )}
+                >
+                  {done ? <CheckCircle2 className="size-4" /> : <Icon className="size-4" />}
+                </div>
+                <span
+                  className={cn(
+                    "hidden text-[10px] font-semibold uppercase tracking-wide sm:block",
+                    active ? "text-ink" : "text-muted-foreground",
+                  )}
+                >
+                  {s.label}
+                </span>
+              </div>
+              {i < STEPS.length - 1 && (
+                <div
+                  className={cn(
+                    "mx-1 mb-5 h-0.5 flex-1 rounded-full transition-colors",
+                    step > s.n ? "bg-aqua" : "bg-border",
+                  )}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-4 text-center text-xs font-medium text-muted-foreground sm:hidden">
+        Step {step} of 6 — {STEPS[step - 1].label}
+      </p>
+    </div>
+  );
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <span className="mb-1.5 block text-sm font-medium text-ink">{children}</span>;
 }
 
 export function BookingWizard() {
@@ -80,14 +151,14 @@ export function BookingWizard() {
         const result = await api.getAvailability(bookingDate, serviceId);
         if (!cancelled) {
           const now = new Date();
-          const todayIso = [
+          const todayStr = [
             now.getFullYear(),
             String(now.getMonth() + 1).padStart(2, "0"),
             String(now.getDate()).padStart(2, "0"),
           ].join("-");
           const raw = result.alternatives ?? [];
           const filtered =
-            bookingDate === todayIso
+            bookingDate === todayStr
               ? raw.filter((slot) => {
                   const [hh, mm] = slot.split(":").map(Number);
                   if (Number.isNaN(hh) || Number.isNaN(mm)) return true;
@@ -166,15 +237,21 @@ export function BookingWizard() {
 
   if (bookingId) {
     return (
-      <div className="rounded-2xl border border-border bg-white p-8 text-center shadow-sm">
-        <p className="font-display text-2xl font-bold text-ink">You&apos;re booked</p>
+      <div className="glass-card animate-fade-up rounded-3xl p-10 text-center">
+        <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-aqua/20 text-aqua">
+          <CheckCircle2 className="size-9" />
+        </div>
+        <p className="mt-6 font-display text-3xl font-bold text-ink">You&apos;re all set!</p>
         <p className="mt-2 text-muted-foreground">
-          {selectedService?.name} on {bookingDate} at {bookingTime.slice(0, 5)}
+          {selectedService?.name} · {bookingDate} at {bookingTime.slice(0, 5)}
         </p>
-        <p className="mt-1 text-xs text-muted-foreground">Confirmation ID: {bookingId}</p>
-        <div className="mt-6 flex justify-center gap-3">
-          <Link href="/" className={cn("text-sm font-semibold text-primary hover:underline")}>
-            Home
+        <Badge variant="aqua" className="mt-4">
+          Confirmed
+        </Badge>
+        <p className="mt-4 text-xs text-muted-foreground">Ref {bookingId.slice(0, 8)}…</p>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <Link href="/" className={buttonVariants({ variant: "outline", size: "lg" })}>
+            Back home
           </Link>
           <Button
             onClick={() => {
@@ -190,46 +267,50 @@ export function BookingWizard() {
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-white p-6 shadow-sm md:p-8">
-      <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-        Step {step} of 6
-      </p>
+    <div className="glass-card animate-fade-up rounded-3xl p-6 md:p-8">
+      <BookingStepper step={step} />
 
       {step === 1 && (
-        <section className="mt-4">
-          <h2 className="font-display text-2xl font-bold">Choose a service</h2>
-          {loadingServices && <p className="mt-4 text-sm text-muted-foreground">Loading services…</p>}
-          {serviceError && <p className="mt-4 text-sm text-destructive">{serviceError}</p>}
+        <section className="animate-fade-up">
+          <h2 className="font-display text-2xl font-bold text-ink">Choose your service</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Tap a package to continue.</p>
+          {loadingServices && <p className="mt-6 text-sm text-muted-foreground">Loading services…</p>}
+          {serviceError && <p className="mt-6 text-sm text-destructive">{serviceError}</p>}
           {!loadingServices && !serviceError && services.length === 0 && (
-            <p className="mt-4 text-sm text-muted-foreground">No active services yet.</p>
+            <p className="mt-6 text-sm text-muted-foreground">No active services yet.</p>
           )}
-          <div className="mt-4 grid gap-3">
+          <div className="mt-6 grid gap-3">
             {services.map((service) => (
               <button
                 key={service.id}
                 type="button"
                 onClick={() => setServiceId(service.id)}
                 className={cn(
-                  "rounded-xl border px-4 py-3 text-left transition",
+                  "group rounded-2xl border p-4 text-left transition-all",
                   serviceId === service.id
-                    ? "border-aqua bg-secondary"
-                    : "border-border hover:border-aqua/50",
+                    ? "border-aqua bg-gradient-to-r from-aqua/10 to-secondary shadow-sm ring-2 ring-aqua/30"
+                    : "border-border bg-white hover:border-aqua/40 hover:shadow-sm",
                 )}
               >
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-semibold text-ink">{service.name}</span>
-                  <span className="text-sm text-muted-foreground">
-                    {service.duration_minutes} min · {String(service.price)}
-                  </span>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <span className="font-display text-lg font-bold text-ink">{service.name}</span>
+                    {service.description && (
+                      <p className="mt-1 text-sm text-muted-foreground">{service.description}</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <Badge variant={serviceId === service.id ? "aqua" : "secondary"}>
+                      {formatPrice(service.price)}
+                    </Badge>
+                    <p className="mt-1 text-xs text-muted-foreground">{service.duration_minutes} min</p>
+                  </div>
                 </div>
-                {service.description && (
-                  <p className="mt-1 text-sm text-muted-foreground">{service.description}</p>
-                )}
               </button>
             ))}
           </div>
-          <div className="mt-6 flex justify-end">
-            <Button disabled={!serviceId} onClick={() => setStep(2)}>
+          <div className="mt-8 flex justify-end">
+            <Button size="lg" disabled={!serviceId} onClick={() => setStep(2)}>
               Continue
             </Button>
           </div>
@@ -237,20 +318,18 @@ export function BookingWizard() {
       )}
 
       {step === 2 && (
-        <section className="mt-4">
-          <h2 className="font-display text-2xl font-bold">Pick a date</h2>
-          <input
-            type="date"
-            min={todayIso()}
-            value={bookingDate}
-            onChange={(e) => setBookingDate(e.target.value)}
-            className="mt-4 w-full rounded-lg border border-input bg-background px-3 py-2"
-          />
-          <div className="mt-6 flex justify-between">
+        <section className="animate-fade-up">
+          <h2 className="font-display text-2xl font-bold text-ink">Pick a date</h2>
+          <p className="mt-1 text-sm text-muted-foreground">When would you like to visit?</p>
+          <div className="mt-6">
+            <FieldLabel>Appointment date</FieldLabel>
+            <Input type="date" min={todayIso()} value={bookingDate} onChange={(e) => setBookingDate(e.target.value)} />
+          </div>
+          <div className="mt-8 flex justify-between">
             <Button variant="outline" onClick={() => setStep(1)}>
               Back
             </Button>
-            <Button disabled={!bookingDate} onClick={() => setStep(3)}>
+            <Button size="lg" disabled={!bookingDate} onClick={() => setStep(3)}>
               Continue
             </Button>
           </div>
@@ -258,11 +337,14 @@ export function BookingWizard() {
       )}
 
       {step === 3 && (
-        <section className="mt-4">
-          <h2 className="font-display text-2xl font-bold">Available times</h2>
-          {slotsLoading && <p className="mt-4 text-sm text-muted-foreground">Checking calendar…</p>}
-          {slotsError && <p className="mt-4 text-sm text-destructive">{slotsError}</p>}
-          <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4">
+        <section className="animate-fade-up">
+          <h2 className="font-display text-2xl font-bold text-ink">Choose a time</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Available slots for <span className="font-medium text-ink">{bookingDate}</span>
+          </p>
+          {slotsLoading && <p className="mt-6 text-sm text-muted-foreground">Checking calendar…</p>}
+          {slotsError && <p className="mt-6 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{slotsError}</p>}
+          <div className="mt-6 grid grid-cols-3 gap-2 sm:grid-cols-4">
             {slots.map((slot) => {
               const label = slot.slice(0, 5);
               return (
@@ -271,10 +353,10 @@ export function BookingWizard() {
                   type="button"
                   onClick={() => setBookingTime(slot)}
                   className={cn(
-                    "rounded-lg border px-2 py-2 text-sm",
+                    "rounded-xl border px-2 py-2.5 text-sm font-medium transition-all",
                     bookingTime === slot
-                      ? "border-aqua bg-secondary font-semibold"
-                      : "border-border hover:border-aqua/50",
+                      ? "border-aqua bg-aqua/15 text-primary shadow-sm"
+                      : "border-border bg-white hover:border-aqua/50",
                   )}
                 >
                   {label}
@@ -283,13 +365,13 @@ export function BookingWizard() {
             })}
           </div>
           {!slotsLoading && slots.length === 0 && !slotsError && (
-            <p className="mt-4 text-sm text-muted-foreground">No open slots that day.</p>
+            <p className="mt-6 text-sm text-muted-foreground">No open slots that day — try another date.</p>
           )}
-          <div className="mt-6 flex justify-between">
+          <div className="mt-8 flex justify-between">
             <Button variant="outline" onClick={() => setStep(2)}>
               Back
             </Button>
-            <Button disabled={!bookingTime} onClick={() => setStep(4)}>
+            <Button size="lg" disabled={!bookingTime} onClick={() => setStep(4)}>
               Continue
             </Button>
           </div>
@@ -297,31 +379,25 @@ export function BookingWizard() {
       )}
 
       {step === 4 && (
-        <section className="mt-4 space-y-4">
-          <h2 className="font-display text-2xl font-bold">Your details</h2>
-          <label className="block text-sm">
-            Name
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-input px-3 py-2"
-              placeholder="Your name"
-            />
-          </label>
-          <label className="block text-sm">
-            Phone
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-input px-3 py-2"
-              placeholder="+92…"
-            />
-          </label>
-          <div className="flex justify-between pt-2">
+        <section className="animate-fade-up space-y-4">
+          <h2 className="font-display text-2xl font-bold text-ink">Your details</h2>
+          <p className="text-sm text-muted-foreground">We&apos;ll use this to confirm your appointment.</p>
+          <div className="mt-4 space-y-4">
+            <label className="block">
+              <FieldLabel>Name</FieldLabel>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+            </label>
+            <label className="block">
+              <FieldLabel>Mobile number</FieldLabel>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+92 300 1234567" type="tel" />
+            </label>
+          </div>
+          <div className="flex justify-between pt-4">
             <Button variant="outline" onClick={() => setStep(3)}>
               Back
             </Button>
             <Button
+              size="lg"
               disabled={name.trim().length < 2 || phone.replace(/\D/g, "").length < 7}
               onClick={() => setStep(5)}
             >
@@ -332,44 +408,38 @@ export function BookingWizard() {
       )}
 
       {step === 5 && (
-        <section className="mt-4 space-y-4">
-          <h2 className="font-display text-2xl font-bold">Vehicle</h2>
-          <label className="block text-sm">
-            Make
-            <input
-              value={make}
-              onChange={(e) => setMake(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-input px-3 py-2"
-              placeholder="Suzuki"
-            />
-          </label>
-          <label className="block text-sm">
-            Model
-            <input
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-input px-3 py-2"
-              placeholder="Swift"
-            />
-          </label>
-          <label className="block text-sm">
-            Type
-            <select
-              value={vehicleType}
-              onChange={(e) => setVehicleType(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-input px-3 py-2"
-            >
-              <option value="sedan">Sedan</option>
-              <option value="hatchback">Hatchback</option>
-              <option value="suv">SUV</option>
-              <option value="other">Other</option>
-            </select>
-          </label>
-          <div className="flex justify-between pt-2">
+        <section className="animate-fade-up space-y-4">
+          <h2 className="font-display text-2xl font-bold text-ink">Your vehicle</h2>
+          <p className="text-sm text-muted-foreground">So we can prep the right bay for you.</p>
+          <div className="mt-4 space-y-4">
+            <label className="block">
+              <FieldLabel>Make</FieldLabel>
+              <Input value={make} onChange={(e) => setMake(e.target.value)} placeholder="Suzuki" />
+            </label>
+            <label className="block">
+              <FieldLabel>Model</FieldLabel>
+              <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="Swift" />
+            </label>
+            <label className="block">
+              <FieldLabel>Type</FieldLabel>
+              <select
+                value={vehicleType}
+                onChange={(e) => setVehicleType(e.target.value)}
+                className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+              >
+                <option value="sedan">Sedan</option>
+                <option value="hatchback">Hatchback</option>
+                <option value="suv">SUV</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+          </div>
+          <div className="flex justify-between pt-4">
             <Button variant="outline" onClick={() => setStep(4)}>
               Back
             </Button>
             <Button
+              size="lg"
               disabled={make.trim().length < 1 || model.trim().length < 1}
               onClick={() => setStep(6)}
             >
@@ -380,31 +450,29 @@ export function BookingWizard() {
       )}
 
       {step === 6 && (
-        <section className="mt-4">
-          <h2 className="font-display text-2xl font-bold">Confirm booking</h2>
-          <ul className="mt-4 space-y-2 rounded-xl bg-foam p-4 text-sm">
-            <li>
-              <strong>Service:</strong> {selectedService?.name}
-            </li>
-            <li>
-              <strong>When:</strong> {bookingDate} at {bookingTime.slice(0, 5)}
-            </li>
-            <li>
-              <strong>Name:</strong> {name}
-            </li>
-            <li>
-              <strong>Phone:</strong> {normalizePhone(phone)}
-            </li>
-            <li>
-              <strong>Vehicle:</strong> {make} {model} ({vehicleType})
-            </li>
+        <section className="animate-fade-up">
+          <h2 className="font-display text-2xl font-bold text-ink">Confirm booking</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Double-check everything looks right.</p>
+          <ul className="mt-6 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-white">
+            {[
+              ["Service", selectedService?.name],
+              ["When", `${bookingDate} at ${bookingTime.slice(0, 5)}`],
+              ["Name", name],
+              ["Phone", normalizePhone(phone)],
+              ["Vehicle", `${make} ${model} (${vehicleType})`],
+            ].map(([k, v]) => (
+              <li key={k} className="flex justify-between gap-4 px-4 py-3 text-sm">
+                <span className="text-muted-foreground">{k}</span>
+                <span className="font-medium text-ink">{v}</span>
+              </li>
+            ))}
           </ul>
           {submitError && <p className="mt-4 text-sm text-destructive">{submitError}</p>}
-          <div className="mt-6 flex justify-between">
+          <div className="mt-8 flex justify-between">
             <Button variant="outline" onClick={() => setStep(5)} disabled={submitting}>
               Back
             </Button>
-            <Button onClick={confirm} disabled={submitting}>
+            <Button size="lg" onClick={confirm} disabled={submitting}>
               {submitting ? "Booking…" : "Confirm booking"}
             </Button>
           </div>

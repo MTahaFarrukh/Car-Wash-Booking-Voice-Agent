@@ -1,8 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAdminAuth } from "@/lib/admin-auth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -38,7 +41,7 @@ export default function AdminLoginPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-foam text-sm text-muted-foreground">
+      <div className="page-mesh-bg flex min-h-screen items-center justify-center text-sm text-muted-foreground">
         Checking session…
       </div>
     );
@@ -46,57 +49,54 @@ export default function AdminLoginPage() {
 
   if (session) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-foam text-sm text-muted-foreground">
+      <div className="page-mesh-bg flex min-h-screen items-center justify-center text-sm text-muted-foreground">
         Signed in — opening dashboard…
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-foam px-4">
-      <div className="w-full max-w-md rounded-2xl border border-border bg-white p-8 shadow-sm">
-        <p className="font-display text-2xl font-bold text-foreground">Sparkle Admin</p>
-        <p className="mt-1 text-sm text-muted-foreground">Sign in to manage bookings and operations.</p>
+    <div className="page-mesh-bg flex min-h-screen items-center justify-center px-4 py-12">
+      <div className="glass-card w-full max-w-md rounded-3xl p-8 md:p-10">
+        <Link href="/" className="font-display text-sm font-bold text-primary hover:underline">
+          ← Sparkle
+        </Link>
+        <p className="mt-6 font-display text-3xl font-bold text-ink">Admin sign in</p>
+        <p className="mt-2 text-sm text-muted-foreground">Manage bookings, customers, and channels.</p>
 
         {!configured && (
-          <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
             Set <code className="text-xs">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
             <code className="text-xs">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> in{" "}
             <code className="text-xs">frontend/.env.local</code>.
           </p>
         )}
 
-        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
-          <label className="block text-sm">
-            <span className="text-muted-foreground">Email</span>
-            <input
+        <form className="mt-8 space-y-4" onSubmit={onSubmit}>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-ink">Email</span>
+            <Input
               type="email"
               autoComplete="username"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 outline-none focus:border-teal-600"
             />
           </label>
-          <label className="block text-sm">
-            <span className="text-muted-foreground">Password</span>
-            <input
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-ink">Password</span>
+            <Input
               type="password"
               autoComplete="current-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 outline-none focus:border-teal-600"
             />
           </label>
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <button
-            type="submit"
-            disabled={submitting || !configured}
-            className="w-full rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-teal-800 disabled:opacity-60"
-          >
+          <Button type="submit" size="lg" className="w-full" disabled={submitting || !configured}>
             {submitting ? "Signing in…" : "Sign in"}
-          </button>
+          </Button>
         </form>
       </div>
     </div>
