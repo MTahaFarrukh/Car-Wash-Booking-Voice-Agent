@@ -8,6 +8,7 @@ import type { Service } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BookingLiveSummary } from "@/components/sparkle/booking-live-summary";
 import { cn } from "@/lib/utils";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
@@ -52,9 +53,9 @@ function BookingStepper({ step }: { step: Step }) {
                 <div
                   className={cn(
                     "flex size-9 items-center justify-center rounded-full border-2 text-xs font-bold transition-all",
-                    done && "border-aqua bg-aqua text-ink",
+                    done && "border-aqua bg-aqua text-warm-white",
                     active && !done && "border-primary bg-primary text-primary-foreground shadow-md",
-                    !done && !active && "border-border bg-white text-muted-foreground",
+                    !done && !active && "border-border bg-white text-chrome",
                   )}
                 >
                   {done ? <CheckCircle2 className="size-4" /> : <Icon className="size-4" />}
@@ -62,7 +63,7 @@ function BookingStepper({ step }: { step: Step }) {
                 <span
                   className={cn(
                     "hidden text-[10px] font-semibold uppercase tracking-wide sm:block",
-                    active ? "text-ink" : "text-muted-foreground",
+                    active ? "text-warm-white" : "text-chrome",
                   )}
                 >
                   {s.label}
@@ -80,7 +81,7 @@ function BookingStepper({ step }: { step: Step }) {
           );
         })}
       </div>
-      <p className="mt-4 text-center text-xs font-medium text-muted-foreground sm:hidden">
+      <p className="mt-4 text-center text-xs font-medium text-chrome sm:hidden">
         Step {step} of 6 — {STEPS[step - 1].label}
       </p>
     </div>
@@ -88,7 +89,7 @@ function BookingStepper({ step }: { step: Step }) {
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <span className="mb-1.5 block text-sm font-medium text-ink">{children}</span>;
+  return <span className="mb-1.5 block text-sm font-medium text-warm-white">{children}</span>;
 }
 
 export function BookingWizard() {
@@ -237,23 +238,25 @@ export function BookingWizard() {
 
   if (bookingId) {
     return (
-      <div className="glass-card animate-fade-up rounded-3xl p-10 text-center">
-        <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-aqua/20 text-aqua">
+      <div className="sparkle-surface animate-fade-up rounded-lg p-10 text-center">
+        <div className="mx-auto flex size-16 items-center justify-center rounded-full border border-aqua/30 bg-aqua/10 text-aqua">
           <CheckCircle2 className="size-9" />
         </div>
-        <p className="mt-6 font-display text-3xl font-bold text-ink">You&apos;re all set!</p>
-        <p className="mt-2 text-muted-foreground">
+        <p className="mt-6 font-display text-3xl font-bold text-warm-white">Confirmed</p>
+        <p className="mt-2 text-chrome">
           {selectedService?.name} · {bookingDate} at {bookingTime.slice(0, 5)}
         </p>
-        <Badge variant="aqua" className="mt-4">
-          Confirmed
+        <Badge variant="confirmed" className="mt-4">
+          Booking complete
         </Badge>
-        <p className="mt-4 text-xs text-muted-foreground">Ref {bookingId.slice(0, 8)}…</p>
+        <p className="mt-4 text-xs text-chrome">Ref {bookingId.slice(0, 8)}…</p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link href="/" className={buttonVariants({ variant: "outline", size: "lg" })}>
             Back home
           </Link>
           <Button
+            size="lg"
+            className="bg-aqua text-graphite hover:bg-aqua/90"
             onClick={() => {
               setBookingId(null);
               setStep(1);
@@ -267,17 +270,18 @@ export function BookingWizard() {
   }
 
   return (
-    <div className="glass-card animate-fade-up rounded-3xl p-6 md:p-8">
+    <div className="lg:grid lg:grid-cols-[1fr_280px] lg:gap-8">
+      <div className="sparkle-surface rounded-lg p-6 md:p-8">
       <BookingStepper step={step} />
 
       {step === 1 && (
         <section className="animate-fade-up">
-          <h2 className="font-display text-2xl font-bold text-ink">Choose your service</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Tap a package to continue.</p>
-          {loadingServices && <p className="mt-6 text-sm text-muted-foreground">Loading services…</p>}
+          <h2 className="font-display text-2xl font-bold text-warm-white">Choose your wash</h2>
+          <p className="mt-1 text-sm text-chrome">Select a service package.</p>
+          {loadingServices && <p className="mt-6 text-sm text-chrome">Loading services…</p>}
           {serviceError && <p className="mt-6 text-sm text-destructive">{serviceError}</p>}
           {!loadingServices && !serviceError && services.length === 0 && (
-            <p className="mt-6 text-sm text-muted-foreground">No active services yet.</p>
+            <p className="mt-6 text-sm text-chrome">No active services yet.</p>
           )}
           <div className="mt-6 grid gap-3">
             {services.map((service) => (
@@ -286,24 +290,24 @@ export function BookingWizard() {
                 type="button"
                 onClick={() => setServiceId(service.id)}
                 className={cn(
-                  "group rounded-2xl border p-4 text-left transition-all",
+                  "group rounded-md border p-4 text-left transition-all",
                   serviceId === service.id
-                    ? "border-aqua bg-gradient-to-r from-aqua/10 to-secondary shadow-sm ring-2 ring-aqua/30"
-                    : "border-border bg-white hover:border-aqua/40 hover:shadow-sm",
+                    ? "border-aqua/50 bg-aqua/5 ring-1 ring-aqua/30"
+                    : "border-white/10 bg-black/20 hover:border-aqua/30",
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <span className="font-display text-lg font-bold text-ink">{service.name}</span>
+                    <span className="font-display text-lg font-bold text-warm-white">{service.name}</span>
                     {service.description && (
-                      <p className="mt-1 text-sm text-muted-foreground">{service.description}</p>
+                      <p className="mt-1 text-sm text-chrome">{service.description}</p>
                     )}
                   </div>
                   <div className="text-right">
                     <Badge variant={serviceId === service.id ? "aqua" : "secondary"}>
                       {formatPrice(service.price)}
                     </Badge>
-                    <p className="mt-1 text-xs text-muted-foreground">{service.duration_minutes} min</p>
+                    <p className="mt-1 text-xs text-chrome">{service.duration_minutes} min</p>
                   </div>
                 </div>
               </button>
@@ -319,8 +323,8 @@ export function BookingWizard() {
 
       {step === 2 && (
         <section className="animate-fade-up">
-          <h2 className="font-display text-2xl font-bold text-ink">Pick a date</h2>
-          <p className="mt-1 text-sm text-muted-foreground">When would you like to visit?</p>
+          <h2 className="font-display text-2xl font-bold text-warm-white">Pick a date</h2>
+          <p className="mt-1 text-sm text-chrome">When would you like to visit?</p>
           <div className="mt-6">
             <FieldLabel>Appointment date</FieldLabel>
             <Input type="date" min={todayIso()} value={bookingDate} onChange={(e) => setBookingDate(e.target.value)} />
@@ -338,11 +342,11 @@ export function BookingWizard() {
 
       {step === 3 && (
         <section className="animate-fade-up">
-          <h2 className="font-display text-2xl font-bold text-ink">Choose a time</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Available slots for <span className="font-medium text-ink">{bookingDate}</span>
+          <h2 className="font-display text-2xl font-bold text-warm-white">Choose a time</h2>
+          <p className="mt-1 text-sm text-chrome">
+            Available slots for <span className="font-medium text-warm-white">{bookingDate}</span>
           </p>
-          {slotsLoading && <p className="mt-6 text-sm text-muted-foreground">Checking calendar…</p>}
+          {slotsLoading && <p className="mt-6 text-sm text-chrome">Checking calendar…</p>}
           {slotsError && <p className="mt-6 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{slotsError}</p>}
           <div className="mt-6 grid grid-cols-3 gap-2 sm:grid-cols-4">
             {slots.map((slot) => {
@@ -365,7 +369,7 @@ export function BookingWizard() {
             })}
           </div>
           {!slotsLoading && slots.length === 0 && !slotsError && (
-            <p className="mt-6 text-sm text-muted-foreground">No open slots that day — try another date.</p>
+            <p className="mt-6 text-sm text-chrome">No open slots that day — try another date.</p>
           )}
           <div className="mt-8 flex justify-between">
             <Button variant="outline" onClick={() => setStep(2)}>
@@ -380,8 +384,8 @@ export function BookingWizard() {
 
       {step === 4 && (
         <section className="animate-fade-up space-y-4">
-          <h2 className="font-display text-2xl font-bold text-ink">Your details</h2>
-          <p className="text-sm text-muted-foreground">We&apos;ll use this to confirm your appointment.</p>
+          <h2 className="font-display text-2xl font-bold text-warm-white">Your details</h2>
+          <p className="text-sm text-chrome">We&apos;ll use this to confirm your appointment.</p>
           <div className="mt-4 space-y-4">
             <label className="block">
               <FieldLabel>Name</FieldLabel>
@@ -409,8 +413,8 @@ export function BookingWizard() {
 
       {step === 5 && (
         <section className="animate-fade-up space-y-4">
-          <h2 className="font-display text-2xl font-bold text-ink">Your vehicle</h2>
-          <p className="text-sm text-muted-foreground">So we can prep the right bay for you.</p>
+          <h2 className="font-display text-2xl font-bold text-warm-white">Your vehicle</h2>
+          <p className="text-sm text-chrome">So we can prep the right bay for you.</p>
           <div className="mt-4 space-y-4">
             <label className="block">
               <FieldLabel>Make</FieldLabel>
@@ -451,8 +455,8 @@ export function BookingWizard() {
 
       {step === 6 && (
         <section className="animate-fade-up">
-          <h2 className="font-display text-2xl font-bold text-ink">Confirm booking</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Double-check everything looks right.</p>
+          <h2 className="font-display text-2xl font-bold text-warm-white">Confirm booking</h2>
+          <p className="mt-1 text-sm text-chrome">Double-check everything looks right.</p>
           <ul className="mt-6 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-white">
             {[
               ["Service", selectedService?.name],
@@ -462,8 +466,8 @@ export function BookingWizard() {
               ["Vehicle", `${make} ${model} (${vehicleType})`],
             ].map(([k, v]) => (
               <li key={k} className="flex justify-between gap-4 px-4 py-3 text-sm">
-                <span className="text-muted-foreground">{k}</span>
-                <span className="font-medium text-ink">{v}</span>
+                <span className="text-chrome">{k}</span>
+                <span className="font-medium text-warm-white">{v}</span>
               </li>
             ))}
           </ul>
@@ -478,6 +482,18 @@ export function BookingWizard() {
           </div>
         </section>
       )}
+      </div>
+
+      <BookingLiveSummary
+        service={selectedService}
+        bookingDate={bookingDate}
+        bookingTime={bookingTime}
+        name={name}
+        phone={phone}
+        make={make}
+        model={model}
+        vehicleType={vehicleType}
+      />
     </div>
   );
 }

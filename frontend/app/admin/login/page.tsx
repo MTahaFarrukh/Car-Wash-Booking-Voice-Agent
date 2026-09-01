@@ -41,7 +41,7 @@ export default function AdminLoginPage() {
 
   if (loading) {
     return (
-      <div className="page-mesh-bg flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+      <div className="sparkle-hero-bg flex min-h-screen items-center justify-center text-sm text-chrome">
         Checking session…
       </div>
     );
@@ -49,52 +49,57 @@ export default function AdminLoginPage() {
 
   if (session) {
     return (
-      <div className="page-mesh-bg flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        Signed in — opening dashboard…
+      <div className="sparkle-hero-bg flex min-h-screen items-center justify-center text-sm text-chrome">
+        Opening dashboard…
       </div>
     );
   }
 
   return (
-    <div className="page-mesh-bg flex min-h-screen items-center justify-center px-4 py-12">
-      <div className="glass-card w-full max-w-md rounded-3xl p-8 md:p-10">
-        <Link href="/" className="font-display text-sm font-bold text-primary hover:underline">
+    <div className="sparkle-hero-bg flex min-h-screen items-center justify-center px-4 py-12">
+      <div className="sparkle-surface w-full max-w-md rounded-lg p-8 md:p-10">
+        <Link href="/" className="text-sm font-medium text-aqua hover:underline">
           ← Sparkle
         </Link>
-        <p className="mt-6 font-display text-3xl font-bold text-ink">Admin sign in</p>
-        <p className="mt-2 text-sm text-muted-foreground">Manage bookings, customers, and channels.</p>
+        <p className="mt-8 font-display text-3xl font-bold text-warm-white">Admin</p>
+        <p className="mt-2 text-sm text-chrome">Sign in to the operations center.</p>
 
         {!configured && (
-          <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            Set <code className="text-xs">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
-            <code className="text-xs">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> in{" "}
-            <code className="text-xs">frontend/.env.local</code>.
+          <p className="mt-4 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+            Set Supabase env vars in <code className="text-xs">frontend/.env.local</code>.
           </p>
         )}
 
         <form className="mt-8 space-y-4" onSubmit={onSubmit}>
           <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-ink">Email</span>
+            <span className="mb-1.5 block text-xs font-medium text-chrome">Email</span>
             <Input
               type="email"
               autoComplete="username"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              className="border-white/10 bg-black/20 text-warm-white"
             />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-ink">Password</span>
+            <span className="mb-1.5 block text-xs font-medium text-chrome">Password</span>
             <Input
               type="password"
               autoComplete="current-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              className="border-white/10 bg-black/20 text-warm-white"
             />
           </label>
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" size="lg" className="w-full" disabled={submitting || !configured}>
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full bg-aqua text-graphite hover:bg-aqua/90"
+            disabled={submitting || !configured}
+          >
             {submitting ? "Signing in…" : "Sign in"}
           </Button>
         </form>

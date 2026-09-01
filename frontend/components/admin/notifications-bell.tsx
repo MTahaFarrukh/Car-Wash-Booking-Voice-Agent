@@ -29,21 +29,21 @@ export function AdminNotificationsBell() {
         type="button"
         aria-label="Booking notifications"
         onClick={() => setOpen((v) => !v)}
-        className="relative rounded-lg border border-border bg-white p-2 text-muted-foreground transition hover:bg-foam"
+        className="relative rounded-md border border-white/10 bg-white/5 p-2 text-chrome transition hover:bg-white/10 hover:text-warm-white"
       >
         <Bell className="size-5" />
         {count > 0 && (
-          <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white">
+          <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-aqua text-[10px] font-bold text-graphite">
             {count > 9 ? "9+" : count}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-80 rounded-xl border border-border bg-white shadow-lg">
-          <div className="border-b px-4 py-3">
-            <p className="font-display text-sm font-semibold text-ink">New appointments</p>
-            <p className="text-xs text-muted-foreground">
+        <div className="sparkle-surface absolute right-0 z-50 mt-2 w-80 rounded-lg">
+          <div className="border-b border-white/5 px-4 py-3">
+            <p className="font-display text-sm font-semibold text-warm-white">New appointments</p>
+            <p className="text-xs text-chrome">
               {loading
                 ? "Checking…"
                 : error
@@ -56,17 +56,17 @@ export function AdminNotificationsBell() {
           </div>
           <ul className="max-h-80 overflow-y-auto">
             {items.length === 0 && !loading && (
-              <li className="px-4 py-6 text-center text-sm text-muted-foreground">No pending notifications</li>
+              <li className="px-4 py-6 text-center text-sm text-chrome">No pending notifications</li>
             )}
             {items.map((item) => (
-              <li key={item.id} className="border-b px-4 py-3 last:border-0">
-                <p className="text-sm font-medium text-ink">
+              <li key={item.id} className="border-b border-white/5 px-4 py-3 last:border-0">
+                <p className="text-sm font-medium text-warm-white">
                   New appointment through {sourceChannelLabel(item.source)}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-xs text-chrome">
                   {item.customer_name ?? "Customer"} · {item.service_name ?? "Service"}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-chrome">
                   {item.booking_date} {String(item.booking_time).slice(0, 5)}
                 </p>
                 <div className="mt-2 flex gap-2">
@@ -74,13 +74,14 @@ export function AdminNotificationsBell() {
                     size="sm"
                     disabled={busyId === item.id}
                     onClick={() => void acknowledge(item.id)}
+                    className="bg-aqua text-graphite hover:bg-aqua/90"
                   >
                     Accept
                   </Button>
                   <Link
                     href="/admin/bookings"
                     onClick={() => setOpen(false)}
-                    className={buttonVariants({ size: "sm", variant: "outline" })}
+                    className={buttonVariants({ size: "sm", variant: "outline", className: "border-white/10 text-chrome" })}
                   >
                     View
                   </Link>
@@ -98,15 +99,10 @@ export function AdminNavNotificationDot({ show, count }: { show: boolean; count?
   if (!show) return null;
   if (count != null && count > 0) {
     return (
-      <span className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white ring-2 ring-sidebar">
+      <span className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-aqua text-[10px] font-bold text-graphite">
         {count > 9 ? "9+" : count}
       </span>
     );
   }
-  return (
-    <span
-      className={cn("ml-auto size-2.5 shrink-0 rounded-full bg-red-500 ring-2 ring-sidebar")}
-      aria-hidden
-    />
-  );
+  return <span className={cn("ml-auto size-2 shrink-0 rounded-full bg-aqua")} aria-hidden />;
 }

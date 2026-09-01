@@ -122,22 +122,17 @@ function AdminShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AdminNotificationsProvider>
-      <div className="flex min-h-screen bg-foam">
+      <div className="flex min-h-screen bg-graphite text-warm-white">
         <AdminSidebar pathname={pathname} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex items-center justify-between border-b border-border bg-white/90 px-6 py-4 backdrop-blur-sm">
+          <header className="flex items-center justify-between border-b border-white/5 bg-graphite-elevated/80 px-6 py-4 backdrop-blur-sm">
             <div>
-              <p className="font-display text-lg font-bold text-ink">Sparkle Car Wash</p>
-              <p className="text-xs text-muted-foreground">Operations dashboard</p>
+              <p className="font-display text-lg font-bold text-warm-white">Sparkle</p>
+              <p className="text-[10px] font-semibold tracking-[0.15em] text-chrome uppercase">Operations center</p>
             </div>
             <AdminNotificationsBell />
           </header>
-          {!configured && (
-            <p className="border-b border-border bg-amber-50 px-6 py-2 text-xs text-amber-700">
-              Supabase env vars missing — login will not work.
-            </p>
-          )}
-          <div className="flex-1 overflow-auto p-6">{children}</div>
+          <div className="flex-1 overflow-auto p-6 md:p-8">{children}</div>
         </div>
       </div>
     </AdminNotificationsProvider>

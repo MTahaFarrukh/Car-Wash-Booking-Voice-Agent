@@ -15,8 +15,8 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Sparkle Car Wash",
-  description: "Book online, by voice, or on WhatsApp — one car wash, three ways to book.",
+  title: "Sparkle — AI Car Wash Booking",
+  description: "Book through voice, WhatsApp, or web. Sparkle handles the rest.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

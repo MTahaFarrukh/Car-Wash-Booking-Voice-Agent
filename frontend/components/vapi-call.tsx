@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Vapi from "@vapi-ai/web";
-import { Mic, PhoneOff, Sparkles } from "lucide-react";
+import { PhoneOff } from "lucide-react";
+import { VoiceOrb, type VoiceOrbState } from "@/components/sparkle/voice-orb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { extractVoiceBookingHints } from "@/lib/voice-booking-hints";
 import { cn } from "@/lib/utils";
 
 type CallState = "idle" | "connecting" | "active" | "ended" | "error";
-
 type TranscriptLine = { role: "user" | "assistant"; text: string };
 
 function formatDuration(totalSeconds: number) {
@@ -19,6 +20,30 @@ function formatDuration(totalSeconds: number) {
     .toString()
     .padStart(2, "0");
   return `${m}:${s}`;
+}
+
+function mapOrbState(state: CallState, speaking: boolean): VoiceOrbState {
+  if (state === "connecting") return "connecting";
+  if (state === "active" && speaking) return "speaking";
+  if (state === "active") return "listening";
+  if (state === "ended") return "completed";
+  return "idle";
+}
+
+function HintRow({ label, value, visible }: { label: string; value?: string; visible: boolean }) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between border-b border-white/5 py-3 last:border-0 transition-all duration-500",
+        visible ? "opacity-100" : "opacity-30",
+      )}
+    >
+      <span className="text-xs text-chrome">{label}</span>
+      <span className={cn("text-sm font-medium", value ? "text-warm-white" : "text-chrome/50")}>
+        {value ?? "—"}
+      </span>
+    </div>
+  );
 }
 
 export function VapiCallPanel() {
@@ -33,12 +58,20 @@ export function VapiCallPanel() {
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
   const [seconds, setSeconds] = useState(0);
   const [phone, setPhone] = useState("");
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
+
+  const hints = useMemo(() => extractVoiceBookingHints(transcript), [transcript]);
+  const orbState = mapOrbState(state, speaking);
 
   useEffect(() => {
     if (state !== "active" && state !== "connecting") return;
     const id = window.setInterval(() => setSeconds((n) => n + 1), 1000);
     return () => window.clearInterval(id);
   }, [state]);
+
+  useEffect(() => {
+    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [transcript]);
 
   useEffect(() => {
     return () => {
@@ -64,7 +97,7 @@ export function VapiCallPanel() {
       const permission = await navigator.mediaDevices.getUserMedia({ audio: true });
       permission.getTracks().forEach((t) => t.stop());
     } catch {
-      setError("Microphone permission was denied. Allow the mic to talk to the assistant.");
+      setError("Microphone permission was denied.");
       setState("error");
       return;
     }
@@ -96,13 +129,8 @@ export function VapiCallPanel() {
       await vapi.start(assistantId, {
         ...(phone.trim()
           ? {
-              variableValues: {
-                customerPhone: phone.trim(),
-                phone: phone.trim(),
-              },
-              metadata: {
-                customerPhone: phone.trim(),
-              },
+              variableValues: { customerPhone: phone.trim(), phone: phone.trim() },
+              metadata: { customerPhone: phone.trim() },
             }
           : {}),
       });
@@ -122,106 +150,104 @@ export function VapiCallPanel() {
     setSpeaking(false);
   }
 
-  const statusLabel =
-    state === "connecting"
-      ? "Connecting…"
-      : state === "active"
-        ? speaking
-          ? "Assistant speaking…"
-          : "Listening…"
-        : state === "ended"
-          ? "Call ended"
-          : state === "error"
-            ? "Call failed"
-            : "Ready when you are";
-
   return (
-    <div className="glass-card mx-auto flex w-full max-w-lg flex-col items-center rounded-3xl p-8 text-center">
-      <div className="flex items-center gap-2 text-aqua">
-        <Sparkles className="size-4" />
-        <span className="text-xs font-semibold tracking-wide uppercase">AI receptionist</span>
-      </div>
-      <p className="mt-3 font-display text-2xl font-bold text-ink">Start a voice booking</p>
-      <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-        Say your service, date, and time — the assistant books through the same backend as the website.
-      </p>
-
-      <label className="mt-6 w-full max-w-sm text-left">
-        <span className="mb-1.5 block text-sm font-medium text-ink">Your mobile</span>
-        <Input
-          type="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="+923001234567"
-          disabled={state === "connecting" || state === "active"}
-        />
-      </label>
-
-      {!configured && (
-        <p className="mt-6 rounded-xl bg-secondary/80 px-4 py-3 text-left text-sm text-muted-foreground">
-          Set <code className="text-xs">NEXT_PUBLIC_VAPI_PUBLIC_KEY</code> and{" "}
-          <code className="text-xs">NEXT_PUBLIC_VAPI_ASSISTANT_ID</code> in{" "}
-          <code className="text-xs">frontend/.env.local</code>.
-        </p>
-      )}
-
-      <div className="relative mt-10 flex size-32 items-center justify-center">
-        {(state === "active" || state === "connecting") && (
-          <>
-            <span className="voice-ring absolute inset-0 rounded-full border-2 border-aqua/40" />
-            <span className="voice-ring absolute inset-2 rounded-full border border-aqua/25 [animation-delay:0.5s]" />
-          </>
-        )}
-        <div
-          className={cn(
-            "relative flex size-28 items-center justify-center rounded-full bg-gradient-to-br from-secondary to-white text-primary shadow-inner",
-            state === "active" && "from-aqua/25 to-aqua/5 text-aqua",
-            speaking && "scale-105 transition-transform",
+    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      {/* Main call surface */}
+      <div className="sparkle-surface rounded-lg p-6 md:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold tracking-[0.2em] text-aqua uppercase">Sparkle Voice</p>
+            <p className="mt-1 font-display text-xl font-semibold text-warm-white">AI Booking Assistant</p>
+          </div>
+          {(state === "active" || state === "connecting") && (
+            <span className="font-mono text-sm tabular-nums text-chrome">{formatDuration(seconds)}</span>
           )}
-        >
-          <Mic className={cn("size-10", state === "active" && !speaking && "animate-pulse-soft")} />
+        </div>
+
+        <div className="mt-10 flex justify-center">
+          <VoiceOrb state={orbState} size="lg" />
+        </div>
+
+        <label className="mt-8 block max-w-sm">
+          <span className="mb-1.5 block text-xs font-medium text-chrome">Mobile (for booking confirmation)</span>
+          <Input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+923001234567"
+            disabled={state === "connecting" || state === "active"}
+            className="border-white/10 bg-black/20 text-warm-white placeholder:text-chrome/50"
+          />
+        </label>
+
+        {!configured && (
+          <p className="mt-4 text-sm text-chrome">
+            Configure <code className="text-aqua">NEXT_PUBLIC_VAPI_PUBLIC_KEY</code> and assistant ID in{" "}
+            <code className="text-aqua">.env.local</code>.
+          </p>
+        )}
+
+        {transcript.length > 0 && (
+          <div className="mt-8 max-h-52 space-y-2 overflow-y-auto rounded-md border border-white/5 bg-black/20 p-4">
+            {transcript.map((line, i) => (
+              <div
+                key={`${line.role}-${i}`}
+                className={cn(
+                  "animate-slide-in rounded-md px-3 py-2 text-sm",
+                  line.role === "assistant" ? "bg-white/5 text-warm-white" : "ml-4 text-aqua",
+                )}
+              >
+                <span className="text-[10px] font-bold tracking-wide text-chrome uppercase">
+                  {line.role === "assistant" ? "Sparkle" : "You"}
+                </span>
+                <p className="mt-0.5">{line.text}</p>
+              </div>
+            ))}
+            <div ref={transcriptEndRef} />
+          </div>
+        )}
+
+        {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+
+        <div className="mt-8 flex flex-wrap gap-3">
+          {(state === "idle" || state === "ended" || state === "error") && (
+            <Button
+              size="lg"
+              onClick={startCall}
+              disabled={!configured}
+              className="bg-aqua text-graphite hover:bg-aqua/90"
+            >
+              Start call
+            </Button>
+          )}
+          {(state === "connecting" || state === "active") && (
+            <Button size="lg" variant="destructive" onClick={endCall}>
+              <PhoneOff className="size-4" />
+              End call
+            </Button>
+          )}
         </div>
       </div>
 
-      <p className="mt-6 font-semibold text-ink">{statusLabel}</p>
-      {(state === "active" || state === "connecting") && (
-        <p className="mt-2 font-mono text-sm tabular-nums text-muted-foreground">{formatDuration(seconds)}</p>
-      )}
+      {/* Booking details panel */}
+      <div className="sparkle-surface h-fit rounded-lg p-6 lg:sticky lg:top-6">
+        <p className="text-[10px] font-semibold tracking-[0.2em] text-chrome uppercase">Booking details</p>
+        <p className="mt-1 font-display text-lg font-semibold text-warm-white">Live extraction</p>
+        <p className="mt-2 text-xs text-chrome">Fields appear as Sparkle understands your conversation.</p>
 
-      {transcript.length > 0 && (
-        <div className="mt-6 max-h-40 w-full max-w-sm space-y-2 overflow-y-auto rounded-2xl border border-border bg-white/80 p-3 text-left">
-          {transcript.map((line, i) => (
-            <div
-              key={`${line.role}-${i}`}
-              className={cn(
-                "rounded-xl px-3 py-2 text-sm",
-                line.role === "assistant"
-                  ? "bg-secondary text-ink"
-                  : "ml-4 bg-primary/10 text-primary",
-              )}
-            >
-              <span className="text-[10px] font-bold uppercase tracking-wide opacity-60">
-                {line.role === "assistant" ? "Sparkle" : "You"}
-              </span>
-              <p className="mt-0.5">{line.text}</p>
-            </div>
-          ))}
+        <div className="mt-6">
+          <HintRow label="Customer" value={phone.trim() || hints.customer} visible={Boolean(phone || hints.customer)} />
+          <HintRow label="Vehicle" value={hints.vehicle} visible={Boolean(hints.vehicle)} />
+          <HintRow label="Service" value={hints.service} visible={Boolean(hints.service)} />
+          <HintRow label="Date" value={hints.date} visible={Boolean(hints.date)} />
+          <HintRow label="Time" value={hints.time} visible={Boolean(hints.time)} />
+          <HintRow label="Status" value={hints.status} visible={Boolean(hints.status)} />
         </div>
-      )}
 
-      {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
-
-      <div className="mt-8 flex gap-3">
-        {(state === "idle" || state === "ended" || state === "error") && (
-          <Button size="lg" onClick={startCall} disabled={!configured}>
-            Start AI Call
-          </Button>
-        )}
-        {(state === "connecting" || state === "active") && (
-          <Button size="lg" variant="destructive" onClick={endCall}>
-            <PhoneOff className="size-4" />
-            End Call
-          </Button>
+        {state === "idle" && transcript.length === 0 && (
+          <p className="mt-6 text-xs leading-relaxed text-chrome">
+            Try: &ldquo;Hey Sparkle, book a premium wash for my Suzuki Swift tomorrow at 5.&rdquo;
+          </p>
         )}
       </div>
     </div>
